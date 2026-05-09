@@ -25,7 +25,7 @@ async def load_cogs():
 
 bot.setup_hook = load_cogs
 
-STATUS = "❤にゃんこ大戦争自動代行❤"
+STATUS = "にゃんこ大戦争自動代行"
 
 @bot.event
 async def on_ready():
