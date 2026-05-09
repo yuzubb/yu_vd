@@ -4,11 +4,29 @@ from discord import app_commands
 import os
 import traceback
 from dotenv import load_dotenv
+import threading
+from flask import Flask
 
 load_dotenv()
 token = os.getenv('TOKEN')
 owner_id = int(os.getenv('OWNER_ID', 0))
 
+# Flask ダミーサーバー
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return 'Bot is running!'
+
+def run_flask():
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
+# Flaskを別スレッドで起動
+thread = threading.Thread(target=run_flask)
+thread.daemon = True
+thread.start()
+
+# Bot本体
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='$', intents=intents, help_command=None, owner_id=owner_id)
 
