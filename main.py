@@ -4,8 +4,12 @@ from discord import app_commands
 import os
 import traceback
 
-TOKEN = "MTUwMTE0NjE3MzgyNDU2OTM0NA.GF8XAZ.ag2qIw2jSgpzJSBWf8qPzHTLa2SMCar9JVKLp4"
+load_dotenv()
 
+TOKEN = os.getenv("DISCORD_TOKEN")
+if not TOKEN:
+    raise ValueError("環境変数 DISCORD_TOKEN が設定されていません。.envファイルを確認してください。")
+    
 intents = discord.Intents.all()
 bot = commands.Bot(
     command_prefix="$",
