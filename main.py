@@ -3,42 +3,84 @@ from discord.ext import commands
 from discord import app_commands
 import os
 import traceback
-from dotenv import load_dotenv
 
-load_dotenv()
-token = os.getenv('TOKEN')
-owner_id = int(os.getenv('OWNER_ID', 0))
+TOKEN = "MTUwMTE0NjE3MzgyNDU2OTM0NA.GF8XAZ.ag2qIw2jSgpzJSBWf8qPzHTLa2SMCar9JVKLp4"
 
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix='$', intents=intents, help_command=None, owner_id=owner_id)
+bot = commands.Bot(
+    command_prefix="$",
+    intents=intents,
+    help_command=None
+)
 
-async def load_cogs():
-    for filename in os.listdir("./Cogs"):
-        if filename.endswith(".py") and filename != "__init__.py":
+async def setup_hook():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    cogs_dir = os.path.join(base_dir, "Cogs")
+
+    print(f"[INFO] Cogs dir: {cogs_dir}")
+
+    if not os.path.exists(cogs_dir):
+        print("[ERROR] Cogsフォルダが存在しません")
+        return
+
+    for file in os.listdir(cogs_dir):
+        if file.endswith(".py") and not file.startswith("_"):
+            ext = f"Cogs.{file[:-3]}"
             try:
-                await bot.load_extension(f"Cogs.{filename[:-3]}")
-                print(f"✅ Loaded {filename}")
+                await bot.load_extension(ext)
+                print(f"[OK] Loaded Cog: {ext}")
             except Exception as e:
-                print(f"❌ Failed to load {filename}: {e}")
+                print(f"[NG] Failed Cog: {ext}")
+                traceback.print_exc()
+
+    # グローバルコマンドを同期
     await bot.tree.sync()
-    print("✅ Commands synced")
+    print("[INFO] Slash commands synced")
 
-bot.setup_hook = load_cogs
-
-STATUS = "❤にゃんこ大戦争自動代行❤"
+bot.setup_hook = setup_hook
 
 @bot.event
 async def on_ready():
-    print("🤖 Bot Is Ready.")
-    await bot.change_presence(activity=discord.Game(name=STATUS), status=discord.Status.idle)
+    print("===================================")
+    print(f"Bot logged in as {bot.user}")
+    print(f"Bot ID: {bot.user.id}")
+    print("===================================")
+    
+    # ========== 永続Viewを直接登録（Cogがまだ読み込まれていない場合の保険） ==========
+    try:
+        from Cogs.有料にゃんこ代行 import DaikoMenuView
+        bot.add_view(DaikoMenuView())
+        print("[INFO] Persistent view registered from main.py")
+    except ImportError as e:
+        print(f"[INFO] Could not import DaikoMenuView: {e}")
+    except Exception as e:
+        print(f"[INFO] Could not register view from main.py: {e}")
+    
+    # 起動後に登録されているコマンドを表示
+    try:
+        commands_list = await bot.tree.fetch_commands()
+        print(f"Registered commands: {len(commands_list)}")
+        for cmd in commands_list:
+            print(f"  - /{cmd.name}")
+    except Exception as e:
+        print(f"Failed to fetch commands: {e}")
 
 @bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    if isinstance(error, app_commands.CheckFailure):
-        print(f"❌ {interaction.user}によるコマンド({interaction.command.name})の実行がブロックされました。")
-        return
-    print(f"❌ Error: {error}")
+async def on_app_command_error(
+    interaction: discord.Interaction,
+    error: app_commands.AppCommandError
+):
+    print(f"Command error: {error}")
     traceback.print_exc()
+    
+    # エラーメッセージをユーザーに送信
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"エラーが発生しました: {error}", ephemeral=True)
+        else:
+            await interaction.followup.send(f"エラーが発生しました: {error}", ephemeral=True)
+    except:
+        pass
 
 if __name__ == "__main__":
-    bot.run(token)
+    bot.run(TOKEN)
