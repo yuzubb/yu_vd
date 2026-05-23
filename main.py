@@ -66,7 +66,6 @@ def git_update():
     log("更新完了!")
     log("=" * 40)
 
-# 起動時にgit更新を実行
 git_update()
 
 # ====================== Bot設定 ======================
@@ -102,14 +101,21 @@ async def on_ready():
     print(f"Bot ID: {bot.user.id}")
     print("===================================")
 
+    # 有料にゃんこ代行の永続View
     try:
         from Cogs.有料にゃんこ代行 import DaikoMenuView
         bot.add_view(DaikoMenuView())
-        print("[INFO] Persistent view registered from main.py")
-    except ImportError as e:
-        print(f"[INFO] Could not import DaikoMenuView: {e}")
+        print("[INFO] DaikoMenuView 登録完了")
     except Exception as e:
-        print(f"[INFO] Could not register view from main.py: {e}")
+        print(f"[INFO] DaikoMenuView 登録失敗: {e}")
+
+    # にゃんこ複製の永続View
+    try:
+        from Cogs.にゃんこ複製 import MainPanelView
+        bot.add_view(MainPanelView())
+        print("[INFO] MainPanelView 登録完了")
+    except Exception as e:
+        print(f"[INFO] MainPanelView 登録失敗: {e}")
 
     try:
         commands_list = await bot.tree.fetch_commands()
