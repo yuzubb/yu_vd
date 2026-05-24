@@ -551,10 +551,10 @@ class VendingCog(commands.Cog):
     vm = app_commands.Group(
         name="vm",
         description="自販機システム",
-        default_permissions=discord.Permissions(administrator=True)
     )
 
     @vm.command(name="create", description="新しい自販機を作成します")
+    @is_allowed()
     @app_commands.describe(id="自販機ID(半角英数字)", name="自販機名")
     async def create(self, interaction: discord.Interaction, id: str, name: str):
         if load_vending(interaction.guild.id, id):
@@ -581,6 +581,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @vm.command(name="delete", description="自販機のデータを削除します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(id="削除する自販機のID")
     async def delete(self, interaction: discord.Interaction, id: str):
@@ -605,6 +606,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @vm.command(name="panel_set", description="自販機パネルをこのチャンネルに設置します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(id="自販機のID")
     async def panel_set(self, interaction: discord.Interaction, id: str):
@@ -627,6 +629,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message("✅ パネルを設置しました。", ephemeral=True)
 
     @vm.command(name="panel_remove", description="設置された自販機パネルを削除します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(id="自販機のID", message_id="削除するパネルのメッセージID")
     async def panel_remove(self, interaction: discord.Interaction, id: str, message_id: str = None):
@@ -658,6 +661,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(f"✅ {removed}件のパネルを削除しました。", ephemeral=True)
 
     @vm.command(name="panel_update", description="パネルを最新の情報に更新します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(id="自販機のID")
     async def panel_update(self, interaction: discord.Interaction, id: str):
@@ -668,6 +672,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message("✅ パネルを更新しました。", ephemeral=True)
 
     @vm.command(name="product_add", description="自販機に商品を追加します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(
         id="自販機のID",
@@ -713,6 +718,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @vm.command(name="product_delete", description="商品を削除します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete, product_id=product_autocomplete)
     @app_commands.describe(id="自販機のID", product_id="削除する商品のID")
     async def product_delete(self, interaction: discord.Interaction, id: str, product_id: str):
@@ -733,6 +739,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @vm.command(name="product_edit", description="商品の情報を変更します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete, product_id=product_autocomplete)
     @app_commands.describe(id="自販機のID", product_id="編集する商品のID")
     async def product_edit(self, interaction: discord.Interaction, id: str, product_id: str):
@@ -746,6 +753,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_modal(modal)
 
     @vm.command(name="stock_add", description="商品に在庫を追加します(在庫無限の場合は現在の在庫をDMに送信してから追加します)")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete, product_id=product_autocomplete)
     @app_commands.describe(id="自販機のID", product_id="在庫を追加する商品のID")
     async def stock_add(self, interaction: discord.Interaction, id: str, product_id: str):
@@ -772,6 +780,7 @@ class VendingCog(commands.Cog):
             await interaction.response.send_modal(modal)
 
     @vm.command(name="stock_withdraw", description="商品の在庫を引き出します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete, product_id=product_autocomplete)
     @app_commands.describe(
         id="自販機のID",
@@ -853,6 +862,7 @@ class VendingCog(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @vm.command(name="notif_set", description="在庫追加通知チャンネルを設定します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(id="自販機のID", channel="通知を送信するチャンネル", role="メンションするロール")
     async def notif_set(
@@ -875,6 +885,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @vm.command(name="notif_remove", description="在庫追加通知の設定を削除します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(id="自販機のID")
     async def notif_remove(self, interaction: discord.Interaction, id: str):
@@ -891,6 +902,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @vm.command(name="log_set", description="購入ログを送信するチャンネルを設定します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(id="自販機のID", channel="ログを送信するチャンネル")
     async def log_set(self, interaction: discord.Interaction, id: str, channel: discord.TextChannel):
@@ -907,6 +919,7 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @vm.command(name="log_remove", description="購入ログチャンネルの設定を削除します")
+    @is_allowed()
     @app_commands.autocomplete(id=vending_autocomplete)
     @app_commands.describe(id="自販機のID")
     async def log_remove(self, interaction: discord.Interaction, id: str):
