@@ -12,7 +12,7 @@ from utils import is_owner
 JST = timezone(timedelta(hours=9))
 
 # ════════════════════════════════════════════════════════════
-#  /proc 直読みヘルパー（psutil不要・Termux対応）
+#  ヘルパー
 # ════════════════════════════════════════════════════════════
 
 def _bar(pct: float, width: int = 12) -> str:
@@ -38,83 +38,84 @@ def _fmt_seconds(sec: int) -> str:
     parts.append(f"{s}秒")
     return " ".join(parts)
 
-# ── CPU 使用率（0.5秒間隔で2回読んで差分）────────────────────
-def _read_cpu_stat():
-    with open("/proc/stat") as f:
-        line = f.readline()          # "cpu  ..."
-    vals = list(map(int, line.split()[1:]))
-    idle  = vals[3] + (vals[4] if len(vals) > 4 else 0)   # idle + iowait
-    total = sum(vals)
-    return idle, total
-
-def get_cpu_percent(interval: float = 0.5) -> float:
-    idle1, total1 = _read_cpu_stat()
-    time.sleep(interval)
-    idle2, total2 = _read_cpu_stat()
-    d_total = total2 - total1
-    d_idle  = idle2  - idle1
-    if d_total == 0:
-        return 0.0
-    return (1 - d_idle / d_total) * 100
-
-# ── CPU コア数 ────────────────────────────────────────────────
-def get_cpu_count() -> int:
-    count = 0
+def _run(cmd: list[str], timeout: int = 5) -> str:
+    """コマンドを実行して stdout を返す。失敗時は空文字"""
     try:
-        with open("/proc/cpuinfo") as f:
-            for line in f:
-                if line.startswith("processor"):
-                    count += 1
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.stdout.strip()
     except Exception:
-        pass
-    return count or 1
+        return ""
 
-# ── CPU 周波数（kHz → MHz）────────────────────────────────────
-def get_cpu_freq_mhz() -> str:
-    paths = [
-        "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq",
-        "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq",
-    ]
-    for p in paths:
-        try:
-            with open(p) as f:
-                khz = int(f.read().strip())
-            return f"{khz / 1000:.0f} MHz"
-        except Exception:
-            pass
-    # /proc/cpuinfo fallback
-    try:
-        with open("/proc/cpuinfo") as f:
-            for line in f:
-                if "cpu MHz" in line or "BogoMIPS" in line:
-                    val = line.split(":")[1].strip()
-                    return f"{float(val):.0f} MHz"
-    except Exception:
-        pass
-    return "不明"
+# ════════════════════════════════════════════════════════════
+#  各情報取得（subprocess / os.statvfs のみ使用）
+# ════════════════════════════════════════════════════════════
 
-# ── ロードアベレージ ──────────────────────────────────────────
+def get_cpu_percent() -> float:
+    """top -bn1 からCPU使用率を取得"""
+    out = _run(["top", "-bn1"])
+    for line in out.splitlines():
+        # "Cpu(s):  3.2 us,  1.0 sy, ..." or "%Cpu(s): 3.2 us"
+        if "cpu" in line.lower() and ("us" in line or "sy" in line):
+            try:
+                # idle を探して 100 - idle
+                for part in line.replace(",", " ").split():
+                    pass
+                # idle値を探す
+                parts = line.replace(",", " ").split()
+                for i, p in enumerate(parts):
+                    if "id" in p.lower() and i > 0:
+                        idle = float(parts[i-1].replace("%", ""))
+                        return max(0.0, 100.0 - idle)
+            except Exception:
+                pass
+    # fallback: uptime のロードアベレージから概算
+    return -1.0  # 取得失敗
+
 def get_load_avg() -> str:
-    try:
-        with open("/proc/loadavg") as f:
-            parts = f.read().split()
-        return f"{parts[0]} / {parts[1]} / {parts[2]}"
-    except Exception:
-        return "N/A"
+    out = _run(["uptime"])
+    if "load average:" in out:
+        return out.split("load average:")[-1].strip()
+    if "load averages:" in out:
+        return out.split("load averages:")[-1].strip()
+    return "N/A"
 
-# ── メモリ（/proc/meminfo, kB → bytes）───────────────────────
-def get_meminfo() -> dict:
-    info = {}
+def get_cpu_count() -> int:
+    out = _run(["nproc"])
     try:
-        with open("/proc/meminfo") as f:
-            for line in f:
-                key, val = line.split(":")
-                info[key.strip()] = int(val.split()[0]) * 1024
+        return int(out)
     except Exception:
         pass
-    return info
+    # fallback
+    out2 = _run(["getconf", "_NPROCESSORS_ONLN"])
+    try:
+        return int(out2)
+    except Exception:
+        return 1
 
-# ── ディスク（os.statvfs）────────────────────────────────────
+def get_meminfo() -> dict:
+    """free コマンドからメモリ情報を取得"""
+    out = _run(["free", "-b"])
+    result = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if parts and parts[0].lower().startswith("mem"):
+            # Mem:  total  used  free  shared  buff/cache  available
+            try:
+                result["total"]     = int(parts[1])
+                result["used"]      = int(parts[2])
+                result["free"]      = int(parts[3])
+                result["available"] = int(parts[6]) if len(parts) > 6 else int(parts[3])
+            except Exception:
+                pass
+        elif parts and parts[0].lower().startswith("swap"):
+            try:
+                result["swap_total"] = int(parts[1])
+                result["swap_used"]  = int(parts[2])
+                result["swap_free"]  = int(parts[3])
+            except Exception:
+                pass
+    return result
+
 def get_disk(path: str = "/") -> dict:
     try:
         st = os.statvfs(path)
@@ -124,80 +125,70 @@ def get_disk(path: str = "/") -> dict:
         pct   = used / total * 100 if total else 0
         return {"total": total, "used": used, "free": free, "percent": pct}
     except Exception:
-        return {}
-
-# ── システム稼働時間（/proc/uptime）──────────────────────────
-def get_uptime() -> str:
-    try:
-        with open("/proc/uptime") as f:
-            secs = float(f.read().split()[0])
-        return _fmt_seconds(int(secs))
-    except Exception:
-        return "不明"
-
-# ── ネットワーク（/proc/net/dev）──────────────────────────────
-def get_net_io() -> list[dict]:
-    results = []
-    try:
-        with open("/proc/net/dev") as f:
-            lines = f.readlines()[2:]        # ヘッダー2行スキップ
-        for line in lines:
-            parts = line.split()
-            nic = parts[0].rstrip(":")
-            if nic == "lo":
-                continue
-            rx = int(parts[1])
-            tx = int(parts[9])
-            results.append({"nic": nic, "rx": rx, "tx": tx})
-    except Exception:
         pass
-    return results
-
-# ── プロセス Top10（/proc/<pid>/stat）────────────────────────
-def get_top_processes(n: int = 10) -> list[dict]:
-    procs = []
-    try:
-        hz = os.sysconf("SC_CLK_TCK")
-        with open("/proc/uptime") as f:
-            uptime_sec = float(f.read().split()[0])
-
-        for pid in os.listdir("/proc"):
-            if not pid.isdigit():
-                continue
+    # fallback: df
+    out = _run(["df", "-B1", path])
+    for line in out.splitlines()[1:]:
+        parts = line.split()
+        if len(parts) >= 5:
             try:
-                stat_path = f"/proc/{pid}/stat"
-                status_path = f"/proc/{pid}/status"
-                with open(stat_path) as f:
-                    raw = f.read()
-                # プロセス名は括弧内
-                name_start = raw.index("(") + 1
-                name_end   = raw.rindex(")")
-                name = raw[name_start:name_end][:16]
-                fields = raw[name_end + 2:].split()
-                utime  = int(fields[11])
-                stime  = int(fields[12])
-                starttime = int(fields[19])
-                total_time = utime + stime
-                proc_age = uptime_sec - starttime / hz
-                cpu_pct = (total_time / hz / proc_age * 100) if proc_age > 0 else 0
-
-                # メモリ（VmRSS）
-                mem_kb = 0
-                with open(status_path) as f:
-                    for line in f:
-                        if line.startswith("VmRSS:"):
-                            mem_kb = int(line.split()[1])
-                            break
-
-                procs.append({"pid": int(pid), "name": name,
-                              "cpu": cpu_pct, "mem_kb": mem_kb})
+                total = int(parts[1]); used = int(parts[2]); free = int(parts[3])
+                pct = used / total * 100 if total else 0
+                return {"total": total, "used": used, "free": free, "percent": pct}
             except Exception:
                 pass
-    except Exception:
-        pass
+    return {}
 
-    return sorted(procs, key=lambda x: x["cpu"], reverse=True)[:n]
+def get_uptime() -> str:
+    out = _run(["uptime", "-p"])
+    if out.startswith("up "):
+        return out[3:]
+    # fallback
+    out2 = _run(["uptime"])
+    if out2:
+        return out2.split(",")[0].split("up")[-1].strip()
+    return "不明"
 
+def get_net_io() -> list[dict]:
+    out = _run(["cat", "/proc/net/dev"])
+    if not out:
+        # ifconfig fallback
+        return []
+    results = []
+    for line in out.splitlines()[2:]:
+        parts = line.split()
+        if not parts:
+            continue
+        nic = parts[0].rstrip(":")
+        if nic == "lo":
+            continue
+        try:
+            results.append({"nic": nic, "rx": int(parts[1]), "tx": int(parts[9])})
+        except Exception:
+            pass
+    return results
+
+def get_top_processes(n: int = 10) -> list[dict]:
+    out = _run(["ps", "-eo", "pid,pcpu,rss,comm", "--sort=-%cpu"], timeout=8)
+    if not out:
+        out = _run(["ps", "-A", "-o", "pid,pcpu,rss,comm"])
+    procs = []
+    for line in out.splitlines()[1:]:
+        parts = line.split(None, 3)
+        if len(parts) < 4:
+            continue
+        try:
+            procs.append({
+                "pid":    int(parts[0]),
+                "cpu":    float(parts[1]),
+                "mem_kb": int(parts[2]),
+                "name":   parts[3].strip()[:20],
+            })
+        except Exception:
+            pass
+    # --sort が効かない環境用
+    procs.sort(key=lambda x: x["cpu"], reverse=True)
+    return procs[:n]
 
 # ════════════════════════════════════════════════════════════
 #  Cog
@@ -208,7 +199,6 @@ class SysinfoCog(commands.Cog):
         self.bot = bot
         self.start_time = time.time()
 
-    # ── /サーバー情報 ─────────────────────────────────────────
     @app_commands.command(
         name="サーバー情報",
         description="CPU・メモリ・ディスク等を表示します（オーナー専用）"
@@ -218,31 +208,31 @@ class SysinfoCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         cpu_pct   = get_cpu_percent()
-        cpu_count = get_cpu_count()
-        cpu_freq  = get_cpu_freq_mhz()
         load_str  = get_load_avg()
+        cpu_count = get_cpu_count()
 
-        mem       = get_meminfo()
-        mem_total = mem.get("MemTotal", 0)
-        mem_avail = mem.get("MemAvailable", 0)
-        mem_used  = mem_total - mem_avail
+        mem = get_meminfo()
+        mem_total = mem.get("total", 0)
+        mem_used  = mem.get("used", 0)
+        mem_avail = mem.get("available", mem.get("free", 0))
         mem_pct   = mem_used / mem_total * 100 if mem_total else 0
-        swap_total = mem.get("SwapTotal", 0)
-        swap_free  = mem.get("SwapFree", 0)
-        swap_used  = swap_total - swap_free
+        swap_total = mem.get("swap_total", 0)
+        swap_used  = mem.get("swap_used", 0)
         swap_pct   = swap_used / swap_total * 100 if swap_total else 0
 
         disk = get_disk()
 
-        now_jst     = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S JST")
-        sys_uptime  = get_uptime()
-        bot_uptime  = _fmt_seconds(int(time.time() - self.start_time))
+        now_jst    = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S JST")
+        sys_uptime = get_uptime()
+        bot_uptime = _fmt_seconds(int(time.time() - self.start_time))
         guild_count = len(self.bot.guilds)
 
+        # CPUが取得できなかった場合はメモリで色判定
+        ref_cpu = cpu_pct if cpu_pct >= 0 else 0
         color = discord.Color.green()
-        if cpu_pct >= 90 or mem_pct >= 90:
+        if ref_cpu >= 90 or mem_pct >= 90:
             color = discord.Color.red()
-        elif cpu_pct >= 70 or mem_pct >= 70:
+        elif ref_cpu >= 70 or mem_pct >= 70:
             color = discord.Color.yellow()
 
         embed = discord.Embed(
@@ -264,13 +254,13 @@ class SysinfoCog(commands.Cog):
             inline=False
         )
 
+        cpu_bar = _bar(cpu_pct) if cpu_pct >= 0 else "取得不可"
         embed.add_field(
             name="⚙️ CPU",
             value=(
                 f"```\n"
-                f"使用率  : {_bar(cpu_pct)}\n"
+                f"使用率  : {cpu_bar}\n"
                 f"コア数  : {cpu_count} コア\n"
-                f"周波数  : {cpu_freq}\n"
                 f"負荷平均: {load_str} (1/5/15分)\n"
                 f"```"
             ),
@@ -320,15 +310,15 @@ class SysinfoCog(commands.Cog):
             inline=False
         )
 
-        status_emoji = "🟢" if cpu_pct < 70 else ("🟡" if cpu_pct < 90 else "🔴")
+        cpu_str = f"{cpu_pct:.1f}%" if cpu_pct >= 0 else "N/A"
         disk_pct = disk.get("percent", 0)
+        status_emoji = "🟢" if ref_cpu < 70 else ("🟡" if ref_cpu < 90 else "🔴")
         embed.set_footer(
-            text=f"{status_emoji} CPU {cpu_pct:.1f}%  |  RAM {mem_pct:.1f}%  |  Disk {disk_pct:.1f}%"
+            text=f"{status_emoji} CPU {cpu_str}  |  RAM {mem_pct:.1f}%  |  Disk {disk_pct:.1f}%"
         )
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    # ── /プロセス ─────────────────────────────────────────────
     @app_commands.command(
         name="プロセス",
         description="CPU使用率Top10プロセスを表示します（オーナー専用）"
@@ -343,8 +333,10 @@ class SysinfoCog(commands.Cog):
         for p in top:
             lines.append(
                 f"{p['pid']:>6}  {p['cpu']:>6.1f}  "
-                f"{_bytes(p['mem_kb']*1024):>8}  {p['name']}"
+                f"{_bytes(p['mem_kb'] * 1024):>8}  {p['name']}"
             )
+        if not top:
+            lines.append("データ取得不可")
 
         embed = discord.Embed(
             title="📊 CPU使用率 Top10 プロセス",
@@ -354,7 +346,6 @@ class SysinfoCog(commands.Cog):
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    # ── /ネットワーク ─────────────────────────────────────────
     @app_commands.command(
         name="ネットワーク",
         description="ネットワーク通信量を表示します（オーナー専用）"
@@ -371,7 +362,7 @@ class SysinfoCog(commands.Cog):
                 f"{n['nic']:<14}  {_bytes(n['rx']):>10}  {_bytes(n['tx']):>10}"
             )
         if not nics:
-            lines.append("データなし")
+            lines.append("データ取得不可")
 
         embed = discord.Embed(
             title="🌐 ネットワーク通信量（起動後累計）",
