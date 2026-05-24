@@ -422,7 +422,7 @@ class MangaCog(commands.Cog):
         save_manga_panels(new_panels)
 
     # ---- 検索コマンド ----
-    @app_commands.command(name="manga", description="momon-ga.com から漫画を検索して視聴します（閲覧は¥50）")
+    @app_commands.command(name="漫画", description="momon-ga.com から漫画を検索して視聴します（閲覧は¥50）")
     @is_allowed()
     @app_commands.describe(query="検索したい漫画のタイトル")
     async def manga_search(self, interaction: discord.Interaction, query: str):
@@ -453,7 +453,7 @@ class MangaCog(commands.Cog):
 
     # ---- パネル管理コマンドグループ（設置・削除は管理者のみ、パネル自体は全員が使用可能）----
     manga_panel = app_commands.Group(
-        name="mangapanel",
+        name="漫画パネル",
         description="漫画パネルの管理（設置・削除は管理者のみ）",
         default_permissions=discord.Permissions(administrator=True)
     )
