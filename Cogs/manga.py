@@ -10,6 +10,7 @@ import json
 import urllib.parse
 import asyncio
 import paypayu
+from utils import is_allowed, is_owner
 
 # ==========================================
 # 設定
@@ -403,6 +404,7 @@ class MangaCog(commands.Cog):
 
     # ---- 検索コマンド ----
     @app_commands.command(name="manga", description="momon-ga.com から漫画を検索して視聴します（閲覧は¥50）")
+    @is_allowed()
     @app_commands.describe(query="検索したい漫画のタイトル")
     async def manga_search(self, interaction: discord.Interaction, query: str):
         await interaction.response.defer(ephemeral=True)
@@ -506,8 +508,8 @@ class MangaCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ---- PayPay受取設定 ----
-    @app_commands.command(name="manga支払い設定", description="漫画閲覧料金の受取PayPayアカウントを設定します（管理者用）")
-    @app_commands.default_permissions(administrator=True)
+    @app_commands.command(name="manga支払い設定", description="漫画閲覧料金の受取PayPayアカウントを設定します（オーナー専用）")
+    @is_owner()
     async def manga_paypay_setup(self, interaction: discord.Interaction):
         user_id_str = str(interaction.user.id)
         paypay_data = load_paypay_data()
@@ -530,6 +532,7 @@ class MangaCog(commands.Cog):
 
     # ---- HTML取得 ----
     @app_commands.command(name="html", description="指定したURLのHTMLソースをファイルとして取得します（あなただけに見えます）")
+    @is_allowed()
     @app_commands.describe(url="HTMLを取得したいウェブサイトのURL")
     async def get_html_source(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer(ephemeral=True)
