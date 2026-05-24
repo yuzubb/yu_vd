@@ -7,7 +7,6 @@ import time
 CONFIG_FILE = "data/config.json"
 LICENSE_FILE = "data/bot_licenses.json"
 
-# ====================== オーナーID ======================
 OWNER_ID = 1455012819291340862
 
 
@@ -109,7 +108,7 @@ def is_owner():
     """オーナーのみ許可するデコレータ"""
     async def predicate(interaction: discord.Interaction) -> bool:
         if interaction.user.id != OWNER_ID:
-            await interaction.response.send_message("🚫 このコマンドはオーナーのみ使用できます", ephemeral=True)
+            await interaction.response.send_message("このコマンドはオーナーのみ使用できます", ephemeral=True)
             return False
         return True
     return app_commands.check(predicate)
@@ -120,7 +119,7 @@ def is_allowed():
     async def predicate(interaction: discord.Interaction) -> bool:
         if not has_valid_license(interaction.user.id):
             await interaction.response.send_message(
-                "🚫 Botの使用権限がありません。購入パネルから利用権を購入してください。",
+                "Botの使用権限がありません。購入パネルから利用権を購入してください。",
                 ephemeral=True
             )
             return False
