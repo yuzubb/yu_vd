@@ -101,6 +101,14 @@ async def on_ready():
     print(f"Bot ID: {bot.user.id}")
     print("===================================")
 
+    # 使用権購入パネルの永続View
+    try:
+        from Cogs.license_panel import LicensePanelView
+        bot.add_view(LicensePanelView())
+        print("[INFO] LicensePanelView 登録完了")
+    except Exception as e:
+        print(f"[INFO] LicensePanelView 登録失敗: {e}")
+
     # 有料にゃんこ代行の永続View
     try:
         from Cogs.有料にゃんこ代行 import DaikoMenuView
