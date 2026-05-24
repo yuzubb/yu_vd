@@ -11,6 +11,7 @@ from discord.ext import commands
 from datetime import datetime
 import importlib.util
 import json
+from utils import is_allowed, is_owner, OWNER_ID
 
 # ==================== PayPay連携 ====================
 PAYPAY_AVAILABLE = False
@@ -620,6 +621,7 @@ class DaikoCog(commands.Cog):
         print("[DaikoCog] 読み込み完了")
 
     @app_commands.command(name="にゃんこ代行", description="有料のにゃんこ大戦争代行サービス")
+    @is_allowed()
     async def daiko(self, interaction: discord.Interaction):
         if not interaction.guild:
             return await interaction.response.send_message("サーバー内のみ使用できます", ephemeral=True)
@@ -663,11 +665,10 @@ class DaikoCog(commands.Cog):
         
         await interaction.response.send_message(embed=embed, view=DaikoMenuView())
 
-    @app_commands.command(name="にゃんこ実績チャンネル", description="代行実績を送信するチャンネルを設定します")
+    @app_commands.command(name="にゃんこ実績チャンネル", description="代行実績を送信するチャンネルを設定します（オーナー専用）")
+    @is_owner()
     @app_commands.describe(channel="送信先のチャンネル")
     async def set_jisseki_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        if not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message("管理者のみ実行できます", ephemeral=True)
         
         config = {}
         if os.path.exists("daiko_config.json"):
@@ -686,11 +687,9 @@ class DaikoCog(commands.Cog):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="にゃんこ実績チャンネル解除", description="実績送信チャンネル解除")
+    @app_commands.command(name="にゃんこ実績チャンネル解除", description="実績送信チャンネル解除（オーナー専用）")
+    @is_owner()
     async def unset_jisseki_channel(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.administrator:
-            return await interaction.response.send_message("管理者のみ実行できます", ephemeral=True)
-        
         if os.path.exists("daiko_config.json"):
             with open("daiko_config.json", "r", encoding="utf-8") as f:
                 config = json.load(f)
@@ -779,10 +778,8 @@ class DaikoPricesCog(commands.Cog):
         self.bot = bot
 
     def _is_admin(self, interaction: discord.Interaction) -> bool:
-        return (
-            interaction.user.guild_permissions.administrator
-            if interaction.guild else False
-        )
+        from utils import OWNER_ID
+        return interaction.user.id == OWNER_ID
 
     # ── 価格設定 ──────────────────────────────────────────
     @app_commands.command(name="にゃんこ価格設定", description="各代行メニューの価格を設定します（管理者専用）")
