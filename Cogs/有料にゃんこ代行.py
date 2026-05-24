@@ -68,67 +68,72 @@ ITEM_PRICES: dict[str, int] = {
     "tutorial_skip": 10, "dojo_max": 10, "missions_clear": 10, "weekly_missions": 10,
 }
 
-# 選択肢（価格付き表示）
+# 選択肢（キーと表示名のみ。価格は実行時に動的取得）
 G1_OPTIONS = [
-    ("xp", f"XP MAX ¥{ITEM_PRICES['xp']}"),
-    ("np", f"NP MAX ¥{ITEM_PRICES['np']}"),
-    ("catfood", f"猫缶 MAX ¥{ITEM_PRICES['catfood']}"),
-    ("battle_items", f"バトルアイテム全種 MAX ¥{ITEM_PRICES['battle_items']}"),
-    ("vitamins", f"ネコビタン全種 MAX ¥{ITEM_PRICES['vitamins']}"),
-    ("base_materials", f"城素材全種 MAX ¥{ITEM_PRICES['base_materials']}"),
-    ("catseyes", f"キャッツアイ全種 MAX ¥{ITEM_PRICES['catseyes']}"),
-    ("talent_orbs", f"本能玉全種 MAX ¥{ITEM_PRICES['talent_orbs']}"),
-    ("rare", f"にゃんチケ&レアチケ MAX ¥{ITEM_PRICES['rare']}"),
-    ("platinum", f"プラチナチケ MAX ¥{ITEM_PRICES['platinum']}"),
-    ("legend", f"レジェチケ MAX ¥{ITEM_PRICES['legend']}"),
-    ("event_ticket", f"イベントチケ&福チケ MAX ¥{ITEM_PRICES['event_ticket']}"),
-    ("lead", f"リーダーシップ MAX ¥{ITEM_PRICES['lead']}"),
-    ("sub_medals", f"地底迷宮メダル全種 MAX ¥{ITEM_PRICES['sub_medals']}")
+    ("xp",            "XP MAX"),
+    ("np",            "NP MAX"),
+    ("catfood",       "猫缶 MAX"),
+    ("battle_items",  "バトルアイテム全種 MAX"),
+    ("vitamins",      "ネコビタン全種 MAX"),
+    ("base_materials","城素材全種 MAX"),
+    ("catseyes",      "キャッツアイ全種 MAX"),
+    ("talent_orbs",   "本能玉全種 MAX"),
+    ("rare",          "にゃんチケ&レアチケ MAX"),
+    ("platinum",      "プラチナチケ MAX"),
+    ("legend",        "レジェチケ MAX"),
+    ("event_ticket",  "イベントチケ&福チケ MAX"),
+    ("lead",          "リーダーシップ MAX"),
+    ("sub_medals",    "地底迷宮メダル全種 MAX"),
 ]
 
 G2_OPTIONS = [
-    ("unlock_all", f"全キャラ開放 ¥{ITEM_PRICES['unlock_all']}"),
-    ("remove_error", f"エラーキャラ削除 ¥{ITEM_PRICES['remove_error']}"),
-    ("levels_max", f"全キャラ/施設 LvMAX ¥{ITEM_PRICES['levels_max']}"),
-    ("forms_max", f"全キャラ最高形態 ¥{ITEM_PRICES['forms_max']}"),
-    ("talents_max", f"全キャラ本能全開放 ¥{ITEM_PRICES['talents_max']}")
+    ("unlock_all",  "全キャラ開放"),
+    ("remove_error","エラーキャラ削除"),
+    ("levels_max",  "全キャラ/施設 LvMAX"),
+    ("forms_max",   "全キャラ最高形態"),
+    ("talents_max", "全キャラ本能全開放"),
 ]
 
 G3_OPTIONS = [
-    ("main_clear", f"メインステージ全クリア+金お宝 ¥{ITEM_PRICES['main_clear']}"),
-    ("zombie_clear", f"メインゾンビステージ全クリア ¥{ITEM_PRICES['zombie_clear']}"),
-    ("legend_clear", f"レジェンド全クリア ¥{ITEM_PRICES['legend_clear']}"),
-    ("uncanny_clear", f"旧レジェンド全クリア ¥{ITEM_PRICES['uncanny_clear']}"),
-    ("legend_quest", f"レジェンドクエスト全クリア ¥{ITEM_PRICES['legend_quest']}"),
-    ("ex_clear", f"真レジェンド全クリア ¥{ITEM_PRICES['ex_clear']}"),
-    ("zero_clear", f"零レジェンド全クリア ¥{ITEM_PRICES['zero_clear']}"),
-    ("aku_clear", f"魔界編全クリア ¥{ITEM_PRICES['aku_clear']}"),
-    ("event_clear", f"イベントステージ全クリア ¥{ITEM_PRICES['event_clear']}")
+    ("main_clear",    "メインステージ全クリア+金お宝"),
+    ("zombie_clear",  "メインゾンビステージ全クリア"),
+    ("legend_clear",  "レジェンド全クリア"),
+    ("uncanny_clear", "旧レジェンド全クリア"),
+    ("legend_quest",  "レジェンドクエスト全クリア"),
+    ("ex_clear",      "真レジェンド全クリア"),
+    ("zero_clear",    "零レジェンド全クリア"),
+    ("aku_clear",     "魔界編全クリア"),
+    ("event_clear",   "イベントステージ全クリア"),
 ]
 
 G4_OPTIONS = [
-    ("gamatoto_max", f"ガマトト LvMAX ¥{ITEM_PRICES['gamatoto_max']}"),
-    ("gamatoto_hlp", f"ガマトト助手 全員レジェンド化 ¥{ITEM_PRICES['gamatoto_hlp']}"),
-    ("ototo_max", f"オトート全城強化 LvMAX ¥{ITEM_PRICES['ototo_max']}"),
-    ("shrine_max", f"にゃんこ神社 LvMAX ¥{ITEM_PRICES['shrine_max']}"),
-    ("playtime", f"プレイ時間カンスト ¥{ITEM_PRICES['playtime']}"),
-    ("gold_member", f"ゴールド会員化 ¥{ITEM_PRICES['gold_member']}"),
-    ("deck_slots", f"編成スロット数最大拡張 ¥{ITEM_PRICES['deck_slots']}"),
-    ("medals", f"にゃんこメダル全開放 ¥{ITEM_PRICES['medals']}"),
-    ("all_medals", f"全メダル獲得 ¥{ITEM_PRICES['all_medals']}"),
-    ("enemy_enc", f"敵キャラ図鑑全開放 ¥{ITEM_PRICES['enemy_enc']}"),
-    ("rank_rewards", f"ユーザーランク報酬全受取 ¥{ITEM_PRICES['rank_rewards']}"),
-    ("tutorial_skip", f"チュートリアルスキップ ¥{ITEM_PRICES['tutorial_skip']}"),
-    ("dojo_max", f"道場スコア MAX ¥{ITEM_PRICES['dojo_max']}"),
-    ("missions_clear", f"全ミッションクリア ¥{ITEM_PRICES['missions_clear']}"),
-    ("weekly_missions", f"ウィークリーミッション全クリア ¥{ITEM_PRICES['weekly_missions']}")
+    ("gamatoto_max",  "ガマトト LvMAX"),
+    ("gamatoto_hlp",  "ガマトト助手 全員レジェンド化"),
+    ("ototo_max",     "オトート全城強化 LvMAX"),
+    ("shrine_max",    "にゃんこ神社 LvMAX"),
+    ("playtime",      "プレイ時間カンスト"),
+    ("gold_member",   "ゴールド会員化"),
+    ("deck_slots",    "編成スロット数最大拡張"),
+    ("medals",        "にゃんこメダル全開放"),
+    ("all_medals",    "全メダル獲得"),
+    ("enemy_enc",     "敵キャラ図鑑全開放"),
+    ("rank_rewards",  "ユーザーランク報酬全受取"),
+    ("tutorial_skip", "チュートリアルスキップ"),
+    ("dojo_max",      "道場スコア MAX"),
+    ("missions_clear","全ミッションクリア"),
+    ("weekly_missions","ウィークリーミッション全クリア"),
 ]
 
 # 表示名（価格なし、金額確認画面用）
-ALL_OPTIONS = {val: label.split(' ¥')[0] for val, label in G1_OPTIONS + G2_OPTIONS + G3_OPTIONS + G4_OPTIONS}
+ALL_OPTIONS = {val: label for val, label in G1_OPTIONS + G2_OPTIONS + G3_OPTIONS + G4_OPTIONS}
 
-def calc_total(selected: list[str]) -> int:
-    prices = _load_prices() if os.path.exists(PRICES_FILE) else ITEM_PRICES
+def get_options_with_price(opts: list, guild_id: int = 0) -> list:
+    """実行時にサーバーの価格を読み込んで (key, "表示名 ¥価格") のリストを返す"""
+    prices = _load_prices(guild_id)
+    return [(key, f"{label} ¥{prices.get(key, ITEM_PRICES.get(key, 0))}") for key, label in opts]
+
+def calc_total(selected: list[str], guild_id: int = 0) -> int:
+    prices = _load_prices(guild_id)
     return sum(prices.get(k, ITEM_PRICES.get(k, 0)) for k in selected)
 
 
@@ -182,7 +187,7 @@ class DaikoLoginModal(ui.Modal, title="アカウントログイン"):
                 description="カテゴリから項目を選んでください",
                 color=0x5865F2
             )
-            await interaction.followup.send(embed=embed, view=DaikoPaidSelectView(editor), ephemeral=True)
+            await interaction.followup.send(embed=embed, view=DaikoPaidSelectView(editor, interaction.guild_id or 0), ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"ログイン失敗: {str(e)}", ephemeral=True)
 
@@ -197,18 +202,19 @@ class DaikoLoginModal(ui.Modal, title="アカウントログイン"):
             pass
 
 class DaikoPaidSelectView(ui.View):
-    def __init__(self, editor):
+    def __init__(self, editor, guild_id: int = 0):
         super().__init__(timeout=300)
         self.editor = editor
+        self.guild_id = guild_id
         self.sel1 = []
         self.sel2 = []
         self.sel3 = []
         self.sel4 = []
 
-        self.add_item(_GroupSelect(self, G1_OPTIONS, "アイテム系を選択", 0))
-        self.add_item(_GroupSelect(self, G2_OPTIONS, "キャラ系を選択", 1))
-        self.add_item(_GroupSelect(self, G3_OPTIONS, "ステージ系を選択", 2))
-        self.add_item(_GroupSelect(self, G4_OPTIONS, "施設・その他を選択", 3))
+        self.add_item(_GroupSelect(self, get_options_with_price(G1_OPTIONS, guild_id), "アイテム系を選択", 0))
+        self.add_item(_GroupSelect(self, get_options_with_price(G2_OPTIONS, guild_id), "キャラ系を選択", 1))
+        self.add_item(_GroupSelect(self, get_options_with_price(G3_OPTIONS, guild_id), "ステージ系を選択", 2))
+        self.add_item(_GroupSelect(self, get_options_with_price(G4_OPTIONS, guild_id), "施設・その他を選択", 3))
 
         btn = ui.Button(label="確定して金額確認", style=discord.ButtonStyle.success, emoji="✅", row=4)
         btn.callback = self._confirm
@@ -222,8 +228,9 @@ class DaikoPaidSelectView(ui.View):
         if not selected:
             return await interaction.response.send_message("何も選択されていません。", ephemeral=True)
 
-        total = calc_total(selected)
-        lines = "\n".join(f"・{ALL_OPTIONS.get(k,k)} ¥{ITEM_PRICES.get(k,0)}" for k in selected)
+        total = calc_total(selected, self.guild_id)
+        prices = _load_prices(self.guild_id)
+        lines = "\n".join(f"・{ALL_OPTIONS.get(k,k)} ¥{prices.get(k, ITEM_PRICES.get(k,0))}" for k in selected)
         embed = discord.Embed(
             title="金額確認",
             description=f"{lines}\n\n**合計 ¥{total}**",
@@ -633,33 +640,14 @@ class DaikoCog(commands.Cog):
             color=0xF5A623
         )
         
-        # アイテム系
-        items_list = []
-        for _, label in G1_OPTIONS:
-            items_list.append(f"・{label}")
-        items = "\n".join(items_list)
-        embed.add_field(name="アイテム系", value=f"```{items}```", inline=False)
-        
-        # キャラ系
-        chars_list = []
-        for _, label in G2_OPTIONS:
-            chars_list.append(f"・{label}")
-        chars = "\n".join(chars_list)
-        embed.add_field(name="キャラ系", value=f"```{chars}```", inline=False)
-        
-        # ステージ系
-        stages_list = []
-        for _, label in G3_OPTIONS:
-            stages_list.append(f"・{label}")
-        stages = "\n".join(stages_list)
-        embed.add_field(name="ステージ系", value=f"```{stages}```", inline=False)
-        
-        # 施設・その他系
-        facilities_list = []
-        for _, label in G4_OPTIONS:
-            facilities_list.append(f"・{label}")
-        facilities = "\n".join(facilities_list)
-        embed.add_field(name="施設・その他系", value=f"```{facilities}```", inline=False)
+        gid = interaction.guild_id or 0
+        def make_field(opts):
+            return "\n".join(f"・{label}" for _, label in get_options_with_price(opts, gid))
+
+        embed.add_field(name="アイテム系",    value=f"```{make_field(G1_OPTIONS)}```", inline=False)
+        embed.add_field(name="キャラ系",      value=f"```{make_field(G2_OPTIONS)}```", inline=False)
+        embed.add_field(name="ステージ系",    value=f"```{make_field(G3_OPTIONS)}```", inline=False)
+        embed.add_field(name="施設・その他系", value=f"```{make_field(G4_OPTIONS)}```", inline=False)
         
         embed.set_footer(text="代行後は新しい引き継ぎコードがDMに送られます")
         
@@ -715,21 +703,26 @@ async def setup(bot: commands.Bot):
 # ====================== 追加コマンド群 ======================
 # ※ DaikoCog のメソッドとして定義するため、クラス外に独立したヘルパーを先に定義
 
-PRICES_FILE = "daiko_prices.json"
-SALES_FILE  = "daiko_sales.json"
+PRICES_DIR   = "daiko_prices"
+SALES_FILE   = "daiko_sales.json"
 LICENSE_FILE = "daiko_licenses.json"
 
-def _load_prices() -> dict:
-    if os.path.exists(PRICES_FILE):
+def _prices_file(guild_id: int) -> str:
+    os.makedirs(PRICES_DIR, exist_ok=True)
+    return os.path.join(PRICES_DIR, f"{guild_id}.json")
+
+def _load_prices(guild_id: int) -> dict:
+    path = _prices_file(guild_id)
+    if os.path.exists(path):
         try:
-            with open(PRICES_FILE, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             pass
-    return dict(ITEM_PRICES)  # デフォルト値
+    return dict(ITEM_PRICES)  # デフォルト値（未設定鯖はデフォルト価格）
 
-def _save_prices(data: dict):
-    with open(PRICES_FILE, "w", encoding="utf-8") as f:
+def _save_prices(guild_id: int, data: dict):
+    with open(_prices_file(guild_id), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def _load_sales() -> dict:
@@ -793,10 +786,12 @@ class DaikoPricesCog(commands.Cog):
         if price < 0:
             return await interaction.response.send_message("0以上の値を入力してください", ephemeral=True)
 
+        gid = interaction.guild_id or 0
+
         # all指定で一括変更
         if item == "all":
             prices = {key: price for key in ITEM_PRICES}
-            _save_prices(prices)
+            _save_prices(gid, prices)
             embed = discord.Embed(
                 title="✅ 価格一括変更完了",
                 description=f"全{len(prices)}項目の価格を **¥{price}** に設定しました",
@@ -810,10 +805,10 @@ class DaikoPricesCog(commands.Cog):
                 f"不明なキー: `{item}`\n\n使えるキー一覧:\n```{keys}```\n\n※ `all` で全アイテム一括変更もできます", ephemeral=True
             )
 
-        prices = _load_prices()
+        prices = _load_prices(gid)
         old = prices.get(item, ITEM_PRICES.get(item, 0))
         prices[item] = price
-        _save_prices(prices)
+        _save_prices(gid, prices)
 
         label = ALL_OPTIONS.get(item, item)
         embed = discord.Embed(
@@ -826,7 +821,8 @@ class DaikoPricesCog(commands.Cog):
     # ── 価格一覧 ──────────────────────────────────────────
     @app_commands.command(name="にゃんこ価格一覧", description="現在の代行メニュー価格一覧を表示します")
     async def list_prices(self, interaction: discord.Interaction):
-        prices = _load_prices()
+        gid = interaction.guild_id or 0
+        prices = _load_prices(gid)
 
         def block(opts):
             lines = []
@@ -939,7 +935,7 @@ class DaikoPricesCog(commands.Cog):
             return await interaction.response.send_message("0以上の値を入力してください", ephemeral=True)
 
         prices = {key: price for key in ITEM_PRICES}
-        _save_prices(prices)
+        _save_prices(interaction.guild_id or 0, prices)
 
         embed = discord.Embed(
             title="✅ 価格一括変更完了",
