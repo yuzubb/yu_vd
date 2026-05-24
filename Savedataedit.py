@@ -1023,4 +1023,3 @@ def _sync_create_account(save_path: str, cc: str) -> SaveEditor: # Discord id ba
  # Discord id ba23d
 async def create_account(save_path: str, cc: str = "en") -> SaveEditor: # Discord id ba23d
     return await asyncio.to_thread(_sync_create_account, save_path, cc) # Discord id ba23d
-
