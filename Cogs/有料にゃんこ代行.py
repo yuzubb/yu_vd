@@ -536,13 +536,14 @@ async def _execute_daiko(editor, selected):
 
 async def send_jisseki_to_channel(interaction, actions, paid):
     """指定されたチャンネルに実績を送信（注文内容・金額・アイコン・名前のみ、コードは含まない）"""
-    config_file = "daiko_config.json"
+    guild_id = interaction.guild_id or 0
+    config_file = os.path.join("daiko_config", f"{guild_id}.json")
     if not os.path.exists(config_file):
         return
-    
+
     with open(config_file, "r", encoding="utf-8") as f:
         config = json.load(f)
-    
+
     channel_id = config.get("jisseki_channel_id")
     if not channel_id:
         return
@@ -657,17 +658,20 @@ class DaikoCog(commands.Cog):
     @is_allowed()
     @app_commands.describe(channel="送信先のチャンネル")
     async def set_jisseki_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        
+        guild_id = interaction.guild_id or 0
+        os.makedirs("daiko_config", exist_ok=True)
+        config_file = os.path.join("daiko_config", f"{guild_id}.json")
+
         config = {}
-        if os.path.exists("daiko_config.json"):
-            with open("daiko_config.json", "r", encoding="utf-8") as f:
+        if os.path.exists(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
                 config = json.load(f)
-        
+
         config["jisseki_channel_id"] = channel.id
-        
-        with open("daiko_config.json", "w", encoding="utf-8") as f:
+
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
-        
+
         embed = discord.Embed(
             title="✅ 設定完了",
             description=f"代行完了時に {channel.mention} に実績を送信します。",
@@ -678,16 +682,19 @@ class DaikoCog(commands.Cog):
     @app_commands.command(name="にゃんこ実績チャンネル解除", description="実績送信チャンネルを解除します")
     @is_allowed()
     async def unset_jisseki_channel(self, interaction: discord.Interaction):
-        if os.path.exists("daiko_config.json"):
-            with open("daiko_config.json", "r", encoding="utf-8") as f:
+        guild_id = interaction.guild_id or 0
+        config_file = os.path.join("daiko_config", f"{guild_id}.json")
+
+        if os.path.exists(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
                 config = json.load(f)
-            
+
             if "jisseki_channel_id" in config:
                 del config["jisseki_channel_id"]
-                
-                with open("daiko_config.json", "w", encoding="utf-8") as f:
+
+                with open(config_file, "w", encoding="utf-8") as f:
                     json.dump(config, f, indent=2, ensure_ascii=False)
-                
+
                 await interaction.response.send_message("実績送信チャンネルを解除しました。", ephemeral=True)
             else:
                 await interaction.response.send_message("設定されていません。", ephemeral=True)
