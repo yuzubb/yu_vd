@@ -1,97 +1,150 @@
 import discord
-from discord import app_commands
+from discord import app_commands, ui
 from discord.ext import commands
 from discord.ui import Button, View, Select
 import aiohttp
 from bs4 import BeautifulSoup
 import os
 import io
+import json
 import urllib.parse
 import asyncio
+import paypayu
+
+# ==========================================
+# 設定
+# ==========================================
+BASE_URL = os.getenv("BASE_URL", "https://momon-ga.com")
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+
+MANGA_PRICE = 50  # 閲覧料金（円）
+PAYPAY_DATA_FILE = "paypay_data.json"
+MANGA_PAYPAY_OWNER_FILE = "manga_paypay_owner.json"
+MANGA_PANEL_FILE = "manga_panel.json"  # パネル設置場所の保存
+
+
+# ==========================================
+# データ管理
+# ==========================================
+
+def load_paypay_data():
+    if os.path.exists(PAYPAY_DATA_FILE):
+        with open(PAYPAY_DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def load_manga_paypay_owner():
+    if os.path.exists(MANGA_PAYPAY_OWNER_FILE):
+        with open(MANGA_PAYPAY_OWNER_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_manga_paypay_owner(data):
+    with open(MANGA_PAYPAY_OWNER_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+
+def load_manga_panels():
+    if os.path.exists(MANGA_PANEL_FILE):
+        with open(MANGA_PANEL_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def save_manga_panels(data):
+    with open(MANGA_PANEL_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
 
 # ==========================================
 # スクレイピング・データ取得ロジック
 # ==========================================
-# .env から取得、なければデフォルト値を使用
-BASE_URL = os.getenv("BASE_URL", "https://momon-ga.com")
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
 async def search_manga(query: str):
-    """タイトル検索を行う関数 (修正版)"""
+    """タイトル検索を行う関数"""
     encoded_query = urllib.parse.quote(query)
-    url = f"{BASE_URL}/?s={encoded_query}" 
-    
+    url = f"{BASE_URL}/?s={encoded_query}"
+
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=HEADERS) as response:
             if response.status != 200:
                 return []
             html = await response.text()
             soup = BeautifulSoup(html, 'html.parser')
-            
+
             results = []
-            # 検索結果のコンテナ構造: .post-list > a
             items = soup.select('.post-list > a')
-            
+
             for item in items:
-                # spanタグ内のテキストを優先取得、なければimgのaltから取得
                 span_tag = item.find('span')
                 if span_tag:
                     title = span_tag.get_text(strip=True)
                 else:
                     img_tag = item.find('img')
                     title = img_tag.get('alt', '').strip() if img_tag else "無題の作品"
-                
+
                 href = item.get('href')
-                
+
                 if title and href:
-                    results.append({
-                        "title": title,
-                        "url": href
-                    })
-            
-            # Discordのセレクトメニュー上限(25件)に合わせる
+                    results.append({"title": title, "url": href})
+
             return results[:25]
 
 
 async def get_pages(manga_url: str):
-    """作品ページからすべての漫画画像URLを取得する関数 (個別ページ構造に最適化)"""
+    """作品ページからすべての漫画画像URLを取得する関数"""
     async with aiohttp.ClientSession() as session:
         async with session.get(manga_url, headers=HEADERS) as response:
             if response.status != 200:
                 return []
             html = await response.text()
             soup = BeautifulSoup(html, 'html.parser')
-            
+
             pages = []
-            
-            # 1. main-area内を探索
             main_area = soup.select_one('.main-area')
             target_soup = main_area if main_area else soup
-            
-            # 2. 遅延読み込み(lazyload)対策を含めてimgタグから画像URLを抽出
+
             for img in target_soup.find_all('img'):
-                # data-src 属性があれば優先（遅延読み込みサイトで有効）
                 src = img.get('data-src') or img.get('src')
                 if src:
-                    # 拡張子が画像ファイルっぽく、かつアバターやアイコン用の画像を除外
                     src_lower = src.lower()
                     if any(ext in src_lower for ext in ['.jpg', '.jpeg', '.png', '.webp']):
                         if 'logo' not in src_lower and 'icon' not in src_lower and 'avatar' not in src_lower:
-                            # 重複を防ぎつつ追加
                             if src not in pages:
                                 pages.append(src)
-            
+
             return pages
 
 
 # ==========================================
-# Discord UI (ボタン・ビュー) の実装
+# パネル Embed 生成
+# ==========================================
+
+def generate_manga_panel_embed():
+    embed = discord.Embed(
+        title="📚 漫画ビューア",
+        description=(
+            "漫画を検索して閲覧できます。\n\n"
+            "🔍 **検索は無料**\n"
+            f"📖 **閲覧は¥{MANGA_PRICE}（1回ごと）**\n\n"
+            "下のボタンを押して漫画を検索してください。"
+        ),
+        color=0x2b2d31
+    )
+    embed.set_footer(text="manga-panel | Powered by momon-ga.com")
+    return embed
+
+
+# ==========================================
+# Discord UI
 # ==========================================
 
 class MangaReaderView(View):
-    """漫画をめくるためのコンパクトなビュー"""
+    """漫画をめくるためのビュー"""
     def __init__(self, pages, title):
-        super().__init__(timeout=300) # 5分でタイムアウト
+        super().__init__(timeout=300)
         self.pages = pages
         self.title = title
         self.current_page = 0
@@ -103,9 +156,9 @@ class MangaReaderView(View):
 
     def make_embed(self):
         embed = discord.Embed(
-            title=self.title, 
-            description=f"ページ: **{self.current_page + 1}** / {len(self.pages)}", 
-            color=0x2b2d31 # Discord背景に馴染む色
+            title=self.title,
+            description=f"ページ: **{self.current_page + 1}** / {len(self.pages)}",
+            color=0x2b2d31
         )
         embed.set_image(url=self.pages[self.current_page])
         return embed
@@ -130,72 +183,357 @@ class MangaReaderView(View):
         self.stop()
 
 
+class MangaPaymentModal(ui.Modal, title="PayPay支払い"):
+    """PayPayリンクを受け取るモーダル"""
+    link_input = ui.TextInput(
+        label="PayPayリンク",
+        placeholder="https://pay.paypay.ne.jp/XXXXXXXXXX",
+        required=True
+    )
+    password_input = ui.TextInput(
+        label="パスワード（設定されている場合のみ）",
+        placeholder="パスワードがある場合のみ入力",
+        required=False,
+        max_length=4
+    )
+
+    def __init__(self, manga_url: str, manga_title: str):
+        super().__init__()
+        self.manga_url = manga_url
+        self.manga_title = manga_title
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+
+        link = self.link_input.value.strip()
+        password = self.password_input.value.strip() or None
+
+        check_result = await paypayu.check_link(link)
+        if not check_result:
+            await interaction.followup.send("❌ 無効なPayPayリンクです。有効なリンクを貼り付けてください。", ephemeral=True)
+            return
+
+        link_amount = check_result.get("payload", {}).get("pendingP2PInfo", {}).get("amount", 0)
+        if link_amount != MANGA_PRICE:
+            await interaction.followup.send(
+                f"❌ リンクの金額（¥{link_amount}）が正しくありません。¥{MANGA_PRICE}のPayPayリンクを送ってください。",
+                ephemeral=True
+            )
+            return
+
+        is_passcode = check_result.get("payload", {}).get("pendingP2PInfo", {}).get("isSetPasscode", False)
+        if is_passcode and password is None:
+            await interaction.followup.send(
+                "⚠️ このリンクにはパスコードが設定されています。パスワード欄に入力してください。",
+                ephemeral=True
+            )
+            return
+
+        owner_data = load_manga_paypay_owner()
+        owner_id = owner_data.get("owner_id")
+        if not owner_id:
+            await interaction.followup.send(
+                "❌ 管理者がPayPayアカウントを設定していません。`/manga支払い設定` で設定が必要です。",
+                ephemeral=True
+            )
+            return
+
+        paypay_data = load_paypay_data()
+        paypay_info = paypay_data.get(str(owner_id))
+        if not paypay_info:
+            await interaction.followup.send("❌ PayPayアカウント情報が見つかりません。管理者に連絡してください。", ephemeral=True)
+            return
+
+        result = await paypayu.link_rev(
+            link,
+            paypay_info["phone"],
+            paypay_info["password"],
+            paypay_info["uuid"],
+            password
+        )
+
+        if result == "LOGINERR":
+            await interaction.followup.send("❌ PayPayログインエラーが発生しました。管理者に連絡してください。", ephemeral=True)
+            return
+
+        if not result:
+            await interaction.followup.send(
+                "❌ PayPayリンクの受け取りに失敗しました。リンクの有効期限が切れているか、すでに使用済みの可能性があります。",
+                ephemeral=True
+            )
+            return
+
+        await interaction.followup.send(
+            f"✅ **¥{MANGA_PRICE}の支払いを確認しました！**\n「{self.manga_title}」を読み込んでいます...",
+            ephemeral=True
+        )
+
+        pages = await get_pages(self.manga_url)
+
+        if not pages:
+            await interaction.followup.send("⚠️ 漫画画像の取得に失敗しました。URLが正しいか確認してください。", ephemeral=True)
+            return
+
+        view = MangaReaderView(pages, self.manga_title)
+        await interaction.followup.send(embed=view.make_embed(), view=view, ephemeral=False)
+
+
+class MangaPaymentView(View):
+    """支払いボタンを表示するビュー"""
+    def __init__(self, manga_url: str, manga_title: str):
+        super().__init__(timeout=300)
+        self.manga_url = manga_url
+        self.manga_title = manga_title
+
+    @discord.ui.button(label="💴 50円を支払って読む", style=discord.ButtonStyle.success)
+    async def pay_button(self, interaction: discord.Interaction, button: Button):
+        modal = MangaPaymentModal(self.manga_url, self.manga_title)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="キャンセル", style=discord.ButtonStyle.danger)
+    async def cancel_button(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.edit_message(content="❌ キャンセルしました。", embeds=[], view=None)
+        self.stop()
+
+
 class MangaSelect(Select):
     """検索結果から作品を選択するセレクトメニュー"""
     def __init__(self, results):
         options = [
-            discord.SelectOption(label=res['title'][:100], value=res['url']) 
+            discord.SelectOption(label=res['title'][:100], value=res['url'])
             for res in results
         ]
         super().__init__(placeholder="読みたい作品を選択してください...", options=options)
 
     async def callback(self, interaction: discord.Interaction):
-        # 読み込み中表示
-        await interaction.response.defer()
-        
-        # 選択された作品の画像一覧を直接取得（話数選択をスキップしてスリム化）
-        pages = await get_pages(self.values[0])
-        
-        if not pages:
-            await interaction.followup.send("⚠️ 漫画画像の取得に失敗したか、ページ内に画像が見つかりませんでした。", ephemeral=True)
-            return
-
-        # 選択した選択肢のタイトルを取得
         selected_title = "無題"
         for option in self.options:
             if option.value == self.values[0]:
                 selected_title = option.label
                 break
 
-        # ビューアを表示
-        view = MangaReaderView(pages, selected_title)
-        await interaction.edit_original_response(embed=view.make_embed(), view=view)
+        manga_url = self.values[0]
+
+        embed = discord.Embed(
+            title="📖 漫画閲覧 - 支払い確認",
+            color=0xf7a800
+        )
+        embed.add_field(name="作品名", value=f"**{selected_title}**", inline=False)
+        embed.add_field(name="閲覧料金", value=f"**¥{MANGA_PRICE}**（1回限り）", inline=False)
+        embed.add_field(
+            name="支払い方法",
+            value=(
+                "1. PayPayアプリで **¥50のリンク** を作成してください\n"
+                "2. 「💴 50円を支払って読む」ボタンを押す\n"
+                "3. 表示されるフォームにリンクを貼り付けてください\n"
+                "4. 支払い確認後、すぐに閲覧できます"
+            ),
+            inline=False
+        )
+        embed.set_footer(text="⚠️ 支払いは1回の閲覧のみ有効です。次回また¥50が必要です。")
+
+        view = MangaPaymentView(manga_url, selected_title)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class MangaSearchModal(ui.Modal, title="漫画検索"):
+    """パネルから検索するためのモーダル"""
+    query_input = ui.TextInput(
+        label="タイトル",
+        placeholder="検索したい漫画のタイトルを入力...",
+        required=True,
+        max_length=100
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        results = await search_manga(self.query_input.value)
+
+        if not results:
+            await interaction.followup.send("❌ 該当する漫画が見つかりませんでした。")
+            return
+
+        view = View()
+        view.add_item(MangaSelect(results))
+
+        embed = discord.Embed(
+            title="🔍 検索結果",
+            description=f"「{self.query_input.value}」の検索結果です。\n以下から作品を選ぶと**¥{MANGA_PRICE}**で閲覧できます。\n\n🆓 検索は無料です",
+            color=0x2b2d31
+        )
+        await interaction.followup.send(embed=embed, view=view)
+
+
+class MangaPanelView(ui.View):
+    """常設パネル用ビュー（timeout=None でBot再起動後も有効）"""
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @ui.button(label="🔍 漫画を検索する", style=discord.ButtonStyle.primary, custom_id="manga_panel:search")
+    async def search_button(self, interaction: discord.Interaction, button: ui.Button):
+        modal = MangaSearchModal()
+        await interaction.response.send_modal(modal)
 
 
 # ==========================================
-# Cogクラスの実装 (スラッシュコマンド)
+# Cogクラス (スラッシュコマンド)
 # ==========================================
 class MangaCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="manga", description="momon-ga.com から漫画を検索して視聴します")
+    async def cog_load(self):
+        """Bot起動時にパネルのViewを永続化登録"""
+        self.bot.add_view(MangaPanelView())
+
+    # ---- パネル更新ヘルパー ----
+    async def update_all_panels(self):
+        panels = load_manga_panels()
+        new_panels = []
+        for loc in panels:
+            try:
+                channel = self.bot.get_channel(loc["channel_id"]) or await self.bot.fetch_channel(loc["channel_id"])
+                message = await channel.fetch_message(loc["message_id"])
+                await message.edit(embed=generate_manga_panel_embed(), view=MangaPanelView())
+                new_panels.append(loc)
+            except Exception:
+                pass  # メッセージが消えていた場合はリストから除外
+        save_manga_panels(new_panels)
+
+    # ---- 検索コマンド ----
+    @app_commands.command(name="manga", description="momon-ga.com から漫画を検索して視聴します（閲覧は¥50）")
     @app_commands.describe(query="検索したい漫画のタイトル")
     async def manga_search(self, interaction: discord.Interaction, query: str):
         await interaction.response.defer()
-        
+
         results = await search_manga(query)
-        
+
         if not results:
             await interaction.followup.send("❌ 該当する漫画が見つかりませんでした。", ephemeral=True)
             return
 
-        # 検索結果をセレクトメニューで提示
         view = View()
         view.add_item(MangaSelect(results))
-        
+
         embed = discord.Embed(
-            title="🔍 検索結果", 
-            description=f"「{query}」の検索結果です。以下から作品を選択してすぐに閲覧できます。", 
+            title="🔍 検索結果",
+            description=f"「{query}」の検索結果です。\n以下から作品を選ぶと**¥{MANGA_PRICE}**で閲覧できます。\n\n🆓 検索は無料です",
             color=0x2b2d31
         )
         await interaction.followup.send(embed=embed, view=view)
 
+    # ---- パネル管理コマンドグループ（設置・削除は管理者のみ、パネル自体は全員が使用可能）----
+    manga_panel = app_commands.Group(
+        name="mangapanel",
+        description="漫画パネルの管理（設置・削除は管理者のみ）",
+        default_permissions=discord.Permissions(administrator=True)
+    )
+
+    @manga_panel.command(name="set", description="このチャンネルに漫画検索パネルを設置します（誰でも使えるパネルが設置されます）")
+    async def panel_set(self, interaction: discord.Interaction):
+        try:
+            message = await interaction.channel.send(
+                embed=generate_manga_panel_embed(),
+                view=MangaPanelView()
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ チャンネルへの送信権限がありません。", ephemeral=True)
+            return
+
+        panels = load_manga_panels()
+        panels.append({
+            "channel_id": interaction.channel.id,
+            "message_id": message.id,
+            "guild_id": interaction.guild.id
+        })
+        save_manga_panels(panels)
+
+        await interaction.response.send_message(
+            f"✅ 漫画パネルを設置しました。\nチャンネル: {interaction.channel.mention}",
+            ephemeral=True
+        )
+
+    @manga_panel.command(name="remove", description="設置済みの漫画パネルを削除します")
+    @app_commands.describe(message_id="削除するパネルのメッセージID（省略すると全パネルを削除）")
+    async def panel_remove(self, interaction: discord.Interaction, message_id: str = None):
+        panels = load_manga_panels()
+        if not panels:
+            await interaction.response.send_message("❌ 設置されているパネルがありません。", ephemeral=True)
+            return
+
+        removed = 0
+        new_panels = []
+        for loc in panels:
+            if message_id is None or str(loc["message_id"]) == message_id:
+                try:
+                    channel = self.bot.get_channel(loc["channel_id"]) or await self.bot.fetch_channel(loc["channel_id"])
+                    msg = await channel.fetch_message(loc["message_id"])
+                    await msg.delete()
+                    removed += 1
+                except Exception:
+                    removed += 1  # すでに消えていてもカウント
+            else:
+                new_panels.append(loc)
+
+        save_manga_panels(new_panels)
+        await interaction.response.send_message(f"✅ {removed}件のパネルを削除しました。", ephemeral=True)
+
+    @manga_panel.command(name="update", description="設置済みの全パネルを最新の表示に更新します")
+    async def panel_update(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        await self.update_all_panels()
+        await interaction.followup.send("✅ パネルを更新しました。", ephemeral=True)
+
+    @manga_panel.command(name="list", description="設置済みのパネル一覧を表示します")
+    async def panel_list(self, interaction: discord.Interaction):
+        panels = load_manga_panels()
+        if not panels:
+            await interaction.response.send_message("現在パネルは設置されていません。", ephemeral=True)
+            return
+
+        lines = []
+        for loc in panels:
+            ch = self.bot.get_channel(loc["channel_id"])
+            ch_str = ch.mention if ch else f"(ID: {loc['channel_id']})"
+            lines.append(f"• {ch_str} — メッセージID: `{loc['message_id']}`")
+
+        embed = discord.Embed(
+            title="📋 設置済み漫画パネル一覧",
+            description="\n".join(lines),
+            color=0x2b2d31
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # ---- PayPay受取設定 ----
+    @app_commands.command(name="manga支払い設定", description="漫画閲覧料金の受取PayPayアカウントを設定します（管理者用）")
+    @app_commands.default_permissions(administrator=True)
+    async def manga_paypay_setup(self, interaction: discord.Interaction):
+        user_id_str = str(interaction.user.id)
+        paypay_data = load_paypay_data()
+
+        if user_id_str not in paypay_data:
+            await interaction.response.send_message(
+                "❌ PayPayアカウントが登録されていません。先に `/paypayログイン` でPayPayアカウントを登録してください。",
+                ephemeral=True
+            )
+            return
+
+        save_manga_paypay_owner({"owner_id": user_id_str})
+
+        await interaction.response.send_message(
+            f"✅ 漫画閲覧料金の受取PayPayアカウントを設定しました。\n"
+            f"ユーザー: {interaction.user.mention}\n"
+            f"閲覧料金: ¥{MANGA_PRICE}/回",
+            ephemeral=True
+        )
+
+    # ---- HTML取得 ----
     @app_commands.command(name="html", description="指定したURLのHTMLソースをファイルとして取得します（あなただけに見えます）")
     @app_commands.describe(url="HTMLを取得したいウェブサイトのURL")
     async def get_html_source(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer(ephemeral=True)
-        
+
         if not (url.startswith("http://") or url.startswith("https://")):
             await interaction.followup.send("❌ 有効なURL（http:// または https:// から始まるもの）を入力してください。", ephemeral=True)
             return
@@ -214,13 +552,10 @@ class MangaCog(commands.Cog):
         try:
             html_bytes = html_text.encode('utf-8')
             file_buffer = io.BytesIO(html_bytes)
-            
             parsed_url = urllib.parse.urlparse(url)
             domain = parsed_url.netloc.replace('.', '_')
             filename = f"source_{domain if domain else 'page'}.html"
-            
             discord_file = discord.File(fp=file_buffer, filename=filename)
-            
             await interaction.followup.send(
                 content=f"📄 **URL:** {url}\nHTMLソースをファイルとして出力しました。ダウンロードしてご確認ください。",
                 file=discord_file,
@@ -231,6 +566,5 @@ class MangaCog(commands.Cog):
             await interaction.followup.send(f"❌ ファイル作成・送信中にエラーが発生しました: {e}", ephemeral=True)
 
 
-# 自動読み込み用のセットアップ関数
 async def setup(bot: commands.Bot):
     await bot.add_cog(MangaCog(bot))
