@@ -1,11 +1,3 @@
-"""
-license_panel.py
-Bot使用権限の購入パネル管理Cog
-- 日数・PayPayリンクを1枚のモーダルにまとめてパネルで完結
-- 単価はオーナーが /使用権単価設定 で変更可能（デフォルト100円/日）
-- 期限切れで自動的に使用不可
-"""
-
 import discord
 from discord import ui, app_commands
 from discord.ext import commands, tasks
