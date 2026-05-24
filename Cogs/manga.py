@@ -134,7 +134,7 @@ def generate_manga_panel_embed():
         ),
         color=0x2b2d31
     )
-    embed.set_footer(text="manga-panel | Powered by momon-ga.com")
+    embed.set_footer(text="mangapanel")
     return embed
 
 
