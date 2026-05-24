@@ -10,17 +10,16 @@ import datetime
 import io
 from dotenv import load_dotenv
 
-# --- 追加: .envファイルから特別なユーザーIDを読み込む ---
-load_dotenv()
-env_user_id = os.getenv("SPECIAL_USER_ID", "0")
-SPECIAL_USER_ID = int(env_user_id) if env_user_id.isdigit() else 0
+from utils import OWNER_ID, is_owner, is_allowed
 
 def is_admin_or_special():
-    """管理者、または.envで指定したユーザーのみ許可するカスタムチェック"""
-    def predicate(interaction: discord.Interaction) -> bool:
-        return interaction.permissions.administrator or interaction.user.id == SPECIAL_USER_ID
+    """オーナーのみ許可するチェック（後方互換のためラッパーとして残す）"""
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if interaction.user.id != OWNER_ID:
+            await interaction.response.send_message("🚫 このコマンドはオーナーのみ使用できます", ephemeral=True)
+            return False
+        return True
     return app_commands.check(predicate)
-# ----------------------------------------------------
 
 # ★ PayPay決済用のインポート
 import paypayu
@@ -770,9 +769,9 @@ class PanelCog(commands.Cog):
         if isinstance(error, app_commands.CheckFailure):
             await interaction.response.send_message("このコマンドを実行する権限がありません。", ephemeral=True)
 
-    @app_commands.command(name="にゃんこ大戦争複製パネル", description="複製・作成パネルを設置します（管理者用）")
+    @app_commands.command(name="にゃんこ大戦争複製パネル", description="複製・作成パネルを設置します（使用権保持者用）")
     @app_commands.describe(duplicate_price="アカウント複製の単価(円)", max_price="最強垢作成の単価(円)")
-    @is_admin_or_special()
+    @is_allowed()
     async def setup_panel(self, interaction: discord.Interaction, duplicate_price: int = 200, max_price: int = 200):
         if self.panel_data:
             old_channel_id = self.panel_data.get("channel_id")
