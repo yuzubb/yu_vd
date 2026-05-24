@@ -4,6 +4,7 @@ from discord.ext import commands
 import aiohttp
 import os
 from dotenv import load_dotenv
+from utils import is_allowed
 
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
@@ -58,6 +59,7 @@ class AICog(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="ai", description="AIと会話します")
+    @is_allowed()
     @app_commands.describe(message="AIへのメッセージ")
     async def ai_chat(self, interaction: discord.Interaction, message: str):
         await interaction.response.defer()
@@ -85,6 +87,7 @@ class AICog(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="ai-reset", description="AIとの会話履歴をリセットします")
+    @is_allowed()
     async def ai_reset(self, interaction: discord.Interaction):
         conversation_histories.pop(interaction.user.id, None)
         await interaction.response.send_message("会話履歴をリセットしました。", ephemeral=True)
