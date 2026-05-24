@@ -307,6 +307,7 @@ class MangaSelect(Select):
         super().__init__(placeholder="読みたい作品を選択してください...", options=options)
 
     async def callback(self, interaction: discord.Interaction):
+        from utils import OWNER_ID
         selected_title = "無題"
         for option in self.options:
             if option.value == self.values[0]:
@@ -314,6 +315,17 @@ class MangaSelect(Select):
                 break
 
         manga_url = self.values[0]
+
+        # オーナーは支払いなしで直接閲覧
+        if interaction.user.id == OWNER_ID:
+            await interaction.response.defer(ephemeral=True)
+            pages = await get_pages(manga_url)
+            if not pages:
+                await interaction.followup.send("⚠️ 漫画画像の取得に失敗しました。URLが正しいか確認してください。", ephemeral=True)
+                return
+            view = MangaReaderView(pages, selected_title)
+            await interaction.followup.send(embed=view.make_embed(), view=view, ephemeral=True)
+            return
 
         embed = discord.Embed(
             title="📖 漫画閲覧 - 支払い確認",
@@ -347,6 +359,7 @@ class MangaSearchModal(ui.Modal, title="漫画検索"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
+        from utils import OWNER_ID
         await interaction.response.defer(ephemeral=True)
 
         results = await search_manga(self.query_input.value)
@@ -358,9 +371,15 @@ class MangaSearchModal(ui.Modal, title="漫画検索"):
         view = View()
         view.add_item(MangaSelect(results))
 
+        is_owner_user = interaction.user.id == OWNER_ID
+        description = (
+            f"「{self.query_input.value}」の検索結果です。\n\n🆓 **オーナー権限：完全無料で閲覧できます**"
+            if is_owner_user else
+            f"「{self.query_input.value}」の検索結果です。\n以下から作品を選ぶと**¥{MANGA_PRICE}**で閲覧できます。\n\n🆓 検索は無料です"
+        )
         embed = discord.Embed(
             title="🔍 検索結果",
-            description=f"「{self.query_input.value}」の検索結果です。\n以下から作品を選ぶと**¥{MANGA_PRICE}**で閲覧できます。\n\n🆓 検索は無料です",
+            description=description,
             color=0x2b2d31
         )
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
@@ -407,6 +426,7 @@ class MangaCog(commands.Cog):
     @is_allowed()
     @app_commands.describe(query="検索したい漫画のタイトル")
     async def manga_search(self, interaction: discord.Interaction, query: str):
+        from utils import OWNER_ID
         await interaction.response.defer(ephemeral=True)
 
         results = await search_manga(query)
@@ -418,9 +438,15 @@ class MangaCog(commands.Cog):
         view = View()
         view.add_item(MangaSelect(results))
 
+        is_owner_user = interaction.user.id == OWNER_ID
+        description = (
+            f"「{query}」の検索結果です。\n\n🆓 **オーナー権限：完全無料で閲覧できます**"
+            if is_owner_user else
+            f"「{query}」の検索結果です。\n以下から作品を選ぶと**¥{MANGA_PRICE}**で閲覧できます。\n\n🆓 検索は無料です"
+        )
         embed = discord.Embed(
             title="🔍 検索結果",
-            description=f"「{query}」の検索結果です。\n以下から作品を選ぶと**¥{MANGA_PRICE}**で閲覧できます。\n\n🆓 検索は無料です",
+            description=description,
             color=0x2b2d31
         )
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
