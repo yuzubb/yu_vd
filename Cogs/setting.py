@@ -4,7 +4,7 @@ from discord import app_commands
 import json
 import os
 
-from utils import is_allowed
+from utils import is_owner, OWNER_ID
 
 CONFIG_FILE = "data/config.json"
 os.makedirs("data", exist_ok=True)
@@ -29,9 +29,9 @@ class SettingCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="許可ユーザー追加", description="ユーザーを追加します")
+    @app_commands.command(name="許可ユーザー追加", description="ユーザーを追加します（オーナー専用）")
     @app_commands.describe(user="追加するユーザー")
-    @is_allowed()
+    @is_owner()
     async def add_allowed_user(self, interaction: discord.Interaction, user: discord.User):
         config = load_config()
         allowed_user_ids = config.get("allowed_user_ids", [])
@@ -44,9 +44,9 @@ class SettingCog(commands.Cog):
         else:
             await interaction.response.send_message(f"🚫 {user.mention} は既に許可ユーザーリストに含まれています。", ephemeral=True)
 
-    @app_commands.command(name="許可ユーザー削除", description="リストからユーザーを削除")
+    @app_commands.command(name="許可ユーザー削除", description="リストからユーザーを削除します（オーナー専用）")
     @app_commands.describe(user="削除するユーザー")
-    @is_allowed()
+    @is_owner()
     async def remove_allowed_user(self, interaction: discord.Interaction, user: discord.User):
         config = load_config()
         allowed_user_ids = config.get("allowed_user_ids", [])
@@ -62,4 +62,3 @@ class SettingCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(SettingCog(bot))
-
