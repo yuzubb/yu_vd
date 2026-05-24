@@ -275,7 +275,7 @@ class MangaPaymentModal(ui.Modal, title="PayPay支払い"):
             return
 
         view = MangaReaderView(pages, self.manga_title)
-        await interaction.followup.send(embed=view.make_embed(), view=view, ephemeral=False)
+        await interaction.followup.send(embed=view.make_embed(), view=view, ephemeral=True)
 
 
 class MangaPaymentView(View):
@@ -346,12 +346,12 @@ class MangaSearchModal(ui.Modal, title="漫画検索"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         results = await search_manga(self.query_input.value)
 
         if not results:
-            await interaction.followup.send("❌ 該当する漫画が見つかりませんでした。")
+            await interaction.followup.send("❌ 該当する漫画が見つかりませんでした。", ephemeral=True)
             return
 
         view = View()
@@ -362,7 +362,7 @@ class MangaSearchModal(ui.Modal, title="漫画検索"):
             description=f"「{self.query_input.value}」の検索結果です。\n以下から作品を選ぶと**¥{MANGA_PRICE}**で閲覧できます。\n\n🆓 検索は無料です",
             color=0x2b2d31
         )
-        await interaction.followup.send(embed=embed, view=view)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 
 class MangaPanelView(ui.View):
@@ -405,7 +405,7 @@ class MangaCog(commands.Cog):
     @app_commands.command(name="manga", description="momon-ga.com から漫画を検索して視聴します（閲覧は¥50）")
     @app_commands.describe(query="検索したい漫画のタイトル")
     async def manga_search(self, interaction: discord.Interaction, query: str):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         results = await search_manga(query)
 
@@ -421,7 +421,7 @@ class MangaCog(commands.Cog):
             description=f"「{query}」の検索結果です。\n以下から作品を選ぶと**¥{MANGA_PRICE}**で閲覧できます。\n\n🆓 検索は無料です",
             color=0x2b2d31
         )
-        await interaction.followup.send(embed=embed, view=view)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     # ---- パネル管理コマンドグループ（設置・削除は管理者のみ、パネル自体は全員が使用可能）----
     manga_panel = app_commands.Group(
