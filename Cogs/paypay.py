@@ -6,7 +6,7 @@ import json
 import os
 import re
 import uuid
-from utils import is_allowed
+from utils import is_owner, OWNER_ID
 import paypayu
 
 PAYPAY_DATA_FILE = "paypay_data.json"
@@ -48,7 +48,7 @@ class ReceiveLinkView(ui.View):
 
     @ui.button(label="受け取る", style=discord.ButtonStyle.success, custom_id="paypay_receive")
     async def receive_button(self, interaction: discord.Interaction, button: ui.Button):
-        if interaction.user.id != interaction.client.application.owner.id:
+        if interaction.user.id != OWNER_ID:
             await interaction.response.send_message(
                 "あなたは使用できません",
                 ephemeral=True
@@ -282,8 +282,8 @@ class PaypayCog(commands.Cog):
 
             await message.channel.send(embed=embed, view=view)
 
-    @app_commands.command(name="paypayログイン", description="PayPayアカウントにログインします")
-    @is_allowed()
+    @app_commands.command(name="paypayログイン", description="PayPayアカウントにログインします（オーナー専用）")
+    @is_owner()
     @app_commands.describe(phone="電話番号", password="パスワード")
     async def paypay_register(self, interaction: discord.Interaction, phone: str, password: str):
         # 最初に応答がないことを確認
@@ -338,8 +338,8 @@ class PaypayCog(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="paypay残高", description="PayPayの残高を確認します")
-    @is_allowed()
+    @app_commands.command(name="paypay残高", description="PayPayの残高を確認します（オーナー専用）")
+    @is_owner()
     async def paypay_balance(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
