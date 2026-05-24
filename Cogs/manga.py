@@ -185,6 +185,61 @@ class MangaCog(commands.Cog):
         )
         await interaction.followup.send(embed=embed, view=view)
 
+# /html コマンドの定義（ファイル送信版）
+    @app_commands.command(name="html", description="指定したURLのHTMLソースをファイルとして取得します（あなただけに見えます）")
+    @app_commands.describe(url="HTMLを取得したいウェブサイトのURL")
+    async def get_html_source(self, interaction: discord.Interaction, url: str):
+        import io  # メモリバッファを使用するためにインポート
+        import urllib.parse
+
+        # 実行した人だけに見える状態(ephemeral=True)で保留にする
+        await interaction.response.defer(ephemeral=True)
+        
+        # 簡易的なURLチェック
+        if not (url.startswith("http://") or url.startswith("https://")):
+            await interaction.followup.send("❌ 有効なURL（http:// または https:// から始まるもの）を入力してください。", ephemeral=True)
+            return
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                # 相手サーバーにBot拒否されないよう一般的なUser-Agentを設定
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                async with session.get(url, headers=headers, timeout=10) as response:
+                    if response.status != 200:
+                        await interaction.followup.send(f"❌ HTMLの取得に失敗しました。ステータスコード: {response.status}", ephemeral=True)
+                        return
+                    
+                    html_text = await response.text()
+        except Exception as e:
+            await interaction.followup.send(f"❌ エラーが発生しました: {e}", ephemeral=True)
+            return
+
+        try:
+            # 取得したHTML文字列をバイトデータに変換し、インメモリファイルを作成
+            html_bytes = html_text.encode('utf-8')
+            file_buffer = io.BytesIO(html_bytes)
+            
+            # URLからドメイン名などを抽出して、ファイル名にする（例: momon-ga_com.html）
+            parsed_url = urllib.parse.urlparse(url)
+            domain = parsed_url.netloc.replace('.', '_')
+            filename = f"source_{domain if domain else 'page'}.html"
+            
+            # discord.File オブジェクトを作成
+            discord_file = discord.File(fp=file_buffer, filename=filename)
+            
+            # ファイルを添付して送信（ephemeral=Trueなので本人のみ表示）
+            await interaction.followup.send(
+                content=f"📄 **URL:** {url}\nHTMLソースをファイルとして出力しました。ダウンロードしてご確認ください。",
+                file=discord_file,
+                ephemeral=True
+            )
+            
+            # バッファを閉じる
+            file_buffer.close()
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ ファイル作成・送信中にエラーが発生しました: {e}", ephemeral=True)
+
 # 自動読み込み用のセットアップ関数
 async def setup(bot: commands.Bot):
     await bot.add_cog(MangaCog(bot))
