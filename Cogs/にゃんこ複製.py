@@ -773,7 +773,7 @@ class PanelCog(commands.Cog):
     @app_commands.command(name="にゃんこ大戦争複製パネル", description="複製・作成パネルを設置します（管理者用）")
     @app_commands.describe(duplicate_price="アカウント複製の単価(円)", max_price="最強垢作成の単価(円)")
     @is_admin_or_special()
-    async def setup_panel(self, interaction: discord.Interaction, duplicate_price: int = 0, max_price: int = 0):
+    async def setup_panel(self, interaction: discord.Interaction, duplicate_price: int = 200, max_price: int = 200):
         if self.panel_data:
             old_channel_id = self.panel_data.get("channel_id")
             old_message_id = self.panel_data.get("message_id")
@@ -797,7 +797,7 @@ class PanelCog(commands.Cog):
         
         self.panel_data["message_id"] = msg.id
         self.save_panel_data()
-        await interaction.response.send_message("パネルを設置しました！")
+        await interaction.response.send_message("パネルを設置しました！", ephemeral=True)
 
     @setup_panel.error
     async def setup_panel_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
