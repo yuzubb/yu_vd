@@ -58,6 +58,31 @@ CATEGORY_EMOJI   = {c["key"]: c["emoji"]  for c in SNS_CATEGORIES}
 CATEGORY_LABEL   = {c["key"]: c["label"]  for c in SNS_CATEGORIES}
 CATEGORY_CHOICES = [app_commands.Choice(name=c["label"], value=c["key"]) for c in SNS_CATEGORIES]
 
+# ─── 初期メニューテンプレート（自販機作成時に自動登録する人気サービス） ────────────
+# service_name_keyword: SMMサービス名に含まれるキーワード（小文字）で自動マッチング
+# margin_rate: 原価に掛ける倍率（例 3.0 = 原価の3倍で販売）
+DEFAULT_MENU_TEMPLATES = [
+    # Instagram
+    {"category": "instagram", "keyword": "instagram followers",        "name": "Instagramフォロワー",          "margin_rate": 3.0, "min_qty": 100,  "max_qty": 10000},
+    {"category": "instagram", "keyword": "instagram likes",            "name": "Instagramいいね",              "margin_rate": 3.0, "min_qty": 50,   "max_qty": 5000},
+    {"category": "instagram", "keyword": "instagram views",            "name": "Instagram動画再生数",          "margin_rate": 3.0, "min_qty": 1000, "max_qty": 100000},
+    # TikTok
+    {"category": "tiktok",    "keyword": "tiktok followers",           "name": "TikTokフォロワー",             "margin_rate": 3.0, "min_qty": 100,  "max_qty": 10000},
+    {"category": "tiktok",    "keyword": "tiktok likes",               "name": "TikTokいいね",                 "margin_rate": 3.0, "min_qty": 100,  "max_qty": 10000},
+    {"category": "tiktok",    "keyword": "tiktok views",               "name": "TikTok動画再生数",             "margin_rate": 3.0, "min_qty": 1000, "max_qty": 500000},
+    # X (Twitter)
+    {"category": "twitter",   "keyword": "twitter followers",          "name": "Xフォロワー",                  "margin_rate": 3.0, "min_qty": 100,  "max_qty": 10000},
+    {"category": "twitter",   "keyword": "twitter likes",              "name": "Xいいね",                      "margin_rate": 3.0, "min_qty": 50,   "max_qty": 5000},
+    # YouTube
+    {"category": "youtube",   "keyword": "youtube subscribers",        "name": "YouTubeチャンネル登録",        "margin_rate": 3.0, "min_qty": 100,  "max_qty": 5000},
+    {"category": "youtube",   "keyword": "youtube views",              "name": "YouTube再生回数",              "margin_rate": 3.0, "min_qty": 1000, "max_qty": 500000},
+    # Threads
+    {"category": "threads",   "keyword": "threads followers",          "name": "Threadsフォロワー",            "margin_rate": 3.5, "min_qty": 100,  "max_qty": 5000},
+]
+
+# SMMサービスのrateはUSD/1000件単位。円換算レート（適宜更新）
+SMM_USD_TO_JPY = 155.0
+
 # ─── JSON ヘルパー ──────────────────────────────────────────────────────────────
 def _ensure_data_dir():
     os.makedirs("data", exist_ok=True)
@@ -124,6 +149,23 @@ async def smm_get_balance() -> dict:
 async def smm_get_services() -> list:
     result = await smm_request({"action": "services"})
     return result if isinstance(result, list) else []
+
+def _calc_price_jpy(rate_str, margin_rate: float) -> float:
+    """SMMのrate（USD/1000件）を円換算して利益マージンを乗せ、1件あたりの円価格を返す"""
+    try:
+        rate_usd_per_1000 = float(rate_str)
+        cost_jpy_per_1    = rate_usd_per_1000 * SMM_USD_TO_JPY / 1000
+        return round(cost_jpy_per_1 * margin_rate, 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+def _match_service(services: list, keyword: str) -> dict | None:
+    """キーワードでSMMサービスリストを検索し最初にヒットしたものを返す"""
+    kw = keyword.lower()
+    for svc in services:
+        if kw in svc.get("name", "").lower():
+            return svc
+    return None
 
 # ─── PayPay 自動受取 UI ────────────────────────────────────────────────────────
 def _fmt_ts(ts) -> str:
@@ -967,20 +1009,101 @@ class SmmVendingCog(commands.Cog):
         ][:25]
 
     # ─── コマンド群 ────────────────────────────────────────────────────────────
-    @app_commands.command(name="フォロ爆自販機作成", description="SMMフォロ爆自販機を新規作成します")
+    @app_commands.command(name="フォロ爆自販機作成", description="SMMフォロ爆自販機を新規作成します（人気サービスを自動登録）")
     @is_allowed()
-    @app_commands.describe(name="自販機の名前")
-    async def vm_create(self, interaction: discord.Interaction, name: str):
+    @app_commands.describe(
+        name="自販機の名前",
+        auto_menu="作成時に人気サービスを自動登録するか（デフォルト: はい）",
+        margin_rate="自動登録時の利益マージン倍率（例: 3.0 = 原価の3倍）",
+    )
+    @app_commands.choices(auto_menu=[
+        app_commands.Choice(name="はい（自動登録する）", value="yes"),
+        app_commands.Choice(name="いいえ（手動で追加する）", value="no"),
+    ])
+    async def vm_create(
+        self, interaction: discord.Interaction,
+        name: str,
+        auto_menu: str = "yes",
+        margin_rate: float = 3.0,
+    ):
         import uuid
+        await interaction.response.defer(ephemeral=True)
+
         vending_data        = load_vending_data()
         vm_id               = str(uuid.uuid4())
         vending_data[vm_id] = {"name": name, "owner_id": str(interaction.user.id)}
         save_vending_data(vending_data)
+
         has_paypay = str(interaction.user.id) in load_paypay_data()
-        msg = f"✅ フォロ爆自販機「{name}」を作成しました。\n**自販機ID:** `{vm_id}`"
+        lines_msg = [f"✅ フォロ爆自販機「{name}」を作成しました。", f"**自販機ID:** `{vm_id}`"]
         if not has_paypay:
-            msg += "\n⚠️ PayPayアカウントが未登録です。`/smm_paypay登録` を先に実行してください。"
-        await interaction.response.send_message(msg, ephemeral=True)
+            lines_msg.append("⚠️ PayPayアカウントが未登録です。`/smm_paypay登録` を先に実行してください。")
+
+        if auto_menu == "no":
+            lines_msg.append("\n💡 `/smmサービス追加` または `/smm自動メニュー追加` でサービスを登録してください。")
+            return await interaction.followup.send("\n".join(lines_msg), ephemeral=True)
+
+        await interaction.followup.send("\n".join(lines_msg) + "\n\n⏳ SMMサービスを取得して初期メニューを自動登録中...", ephemeral=True)
+
+        services = await smm_get_services()
+        if not services:
+            await interaction.followup.send(
+                "⚠️ SMMサービスの取得に失敗しました。APIキーを確認するか、"
+                "`/smm自動メニュー追加` で後から自動登録できます。",
+                ephemeral=True,
+            )
+            return
+
+        menu    = load_smm_menu()
+        added   = []
+        skipped = []
+        for tmpl in DEFAULT_MENU_TEMPLATES:
+            svc = _match_service(services, tmpl["keyword"])
+            if not svc:
+                skipped.append(f"❓ {tmpl['name']}（キーワード未ヒット: {tmpl['keyword']}）")
+                continue
+            service_id = int(svc.get("service", 0))
+            if any(m["service_id"] == service_id and m.get("vm_id") == vm_id for m in menu):
+                skipped.append(f"⚠️ {tmpl['name']}（ID:{service_id} 既登録）")
+                continue
+            actual_margin = tmpl["margin_rate"] * (margin_rate / 3.0)
+            sell_price    = _calc_price_jpy(svc.get("rate", "0"), actual_margin)
+            if sell_price <= 0:
+                skipped.append(f"⚠️ {tmpl['name']}（価格計算失敗）")
+                continue
+            menu.append({
+                "vm_id":       vm_id,
+                "owner_id":    str(interaction.user.id),
+                "category":    tmpl["category"],
+                "service_id":  service_id,
+                "name":        tmpl["name"],
+                "price":       sell_price,
+                "min_qty":     int(max(tmpl["min_qty"], int(svc.get("min", tmpl["min_qty"])))),
+                "max_qty":     int(min(tmpl["max_qty"], int(svc.get("max", tmpl["max_qty"])))),
+                "cost_rate":   svc.get("rate", "0"),
+                "margin_rate": actual_margin,
+            })
+            added.append(f"✅ {tmpl['name']}（ID:{service_id}  ¥{sell_price}/件）")
+
+        save_smm_menu(menu)
+
+        result_embed = discord.Embed(
+            title=f"📦 初期メニュー自動登録結果 — {name}",
+            color=discord.Color.green() if added else discord.Color.orange(),
+            timestamp=discord.utils.utcnow(),
+        )
+        if added:
+            result_embed.add_field(name=f"登録成功 {len(added)}件", value="\n".join(added)[:1024], inline=False)
+        if skipped:
+            result_embed.add_field(name=f"スキップ {len(skipped)}件", value="\n".join(skipped)[:1024], inline=False)
+        result_embed.add_field(
+            name="次のステップ",
+            value="`/フォロ爆パネル設置` でパネルを設置するとすぐに販売開始できます。\n"
+                  "価格は `/smmサービス削除` → `/smmサービス追加` で個別に変更できます。",
+            inline=False,
+        )
+        result_embed.set_footer(text=f"マージン倍率: {margin_rate}x | SMM自販機")
+        await interaction.followup.send(embed=result_embed, ephemeral=True)
 
     @app_commands.command(name="フォロ爆パネル設置", description="フォロ爆自販機パネルをこのチャンネルに設置します")
     @is_allowed()
@@ -1367,6 +1490,126 @@ class SmmVendingCog(commands.Cog):
         embed.add_field(name="電話番号", value=f"```{info['phone']}```", inline=True)
         embed.set_footer(text="SMM自販機")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="smm自動メニュー追加", description="SMMサービス一覧から利益マージンを付けて既存の自販機にまとめて追加します")
+    @is_allowed()
+    @app_commands.autocomplete(vm_id=_vm_id_ac)
+    @app_commands.describe(
+        vm_id="追加先の自販機ID",
+        margin_rate="利益マージン倍率（例: 3.0 = 原価の3倍）",
+        keyword="絞り込みキーワード（空白=全テンプレート）",
+    )
+    async def smm_auto_add_menu(
+        self, interaction: discord.Interaction,
+        vm_id: str,
+        margin_rate: float = 3.0,
+        keyword: str = "",
+    ):
+        vending_data = load_vending_data()
+        vm = vending_data.get(vm_id)
+        if not vm or vm.get("owner_id") != str(interaction.user.id):
+            return await interaction.response.send_message("❌ 指定された自販機が見つかりません。", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True)
+        services = await smm_get_services()
+        if not services:
+            return await interaction.followup.send("❌ SMMサービスの取得に失敗しました。APIキーを確認してください。", ephemeral=True)
+
+        menu    = load_smm_menu()
+        added   = []
+        skipped = []
+        kw_filter = keyword.lower()
+
+        for tmpl in DEFAULT_MENU_TEMPLATES:
+            if kw_filter and kw_filter not in tmpl["keyword"] and kw_filter not in tmpl["name"].lower():
+                continue
+            svc = _match_service(services, tmpl["keyword"])
+            if not svc:
+                skipped.append(f"❓ {tmpl['name']}（キーワード未ヒット）")
+                continue
+            service_id = int(svc.get("service", 0))
+            if any(m["service_id"] == service_id and m.get("vm_id") == vm_id for m in menu):
+                skipped.append(f"⚠️ {tmpl['name']}（ID:{service_id} 既登録）")
+                continue
+            actual_margin = tmpl["margin_rate"] * (margin_rate / 3.0)
+            sell_price    = _calc_price_jpy(svc.get("rate", "0"), actual_margin)
+            if sell_price <= 0:
+                skipped.append(f"⚠️ {tmpl['name']}（価格計算失敗）")
+                continue
+            menu.append({
+                "vm_id":       vm_id,
+                "owner_id":    str(interaction.user.id),
+                "category":    tmpl["category"],
+                "service_id":  service_id,
+                "name":        tmpl["name"],
+                "price":       sell_price,
+                "min_qty":     int(max(tmpl["min_qty"], int(svc.get("min", tmpl["min_qty"])))),
+                "max_qty":     int(min(tmpl["max_qty"], int(svc.get("max", tmpl["max_qty"])))),
+                "cost_rate":   svc.get("rate", "0"),
+                "margin_rate": actual_margin,
+            })
+            added.append(f"✅ {tmpl['name']}（ID:{service_id}  ¥{sell_price}/件）")
+
+        save_smm_menu(menu)
+
+        embed = discord.Embed(
+            title=f"📦 自動メニュー追加結果 — {vm['name']}",
+            color=discord.Color.green() if added else discord.Color.orange(),
+            timestamp=discord.utils.utcnow(),
+        )
+        if added:
+            embed.add_field(name=f"追加成功 {len(added)}件", value="\n".join(added)[:1024], inline=False)
+        if skipped:
+            embed.add_field(name=f"スキップ {len(skipped)}件", value="\n".join(skipped)[:1024], inline=False)
+        embed.add_field(
+            name="反映方法",
+            value="`/フォロ爆パネル設置` でパネルを再設置すると反映されます。",
+            inline=False,
+        )
+        embed.set_footer(text=f"マージン倍率: {margin_rate}x | SMM自販機")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="smm利益確認", description="登録済みサービスの原価・販売価格・利益率を一覧表示します")
+    @is_allowed()
+    @app_commands.autocomplete(vm_id=_vm_id_ac)
+    @app_commands.describe(vm_id="自販機（省略で全件）")
+    async def smm_profit_check(self, interaction: discord.Interaction, vm_id: str = None):
+        menu = load_smm_menu()
+        if vm_id:
+            menu = [m for m in menu if m.get("vm_id") == vm_id]
+        menu = [m for m in menu if m.get("owner_id") == str(interaction.user.id)]
+        if not menu:
+            return await interaction.response.send_message("登録済みのサービスがありません。", ephemeral=True)
+
+        embed = discord.Embed(
+            title="💹 原価・利益確認",
+            color=discord.Color.gold(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(text="※原価はSMMのUSD/1000件レートをJPY換算 | SMM自販機")
+
+        for m in menu:
+            cost_rate  = m.get("cost_rate")
+            sell_price = m.get("price", 0)
+            margin     = m.get("margin_rate", 0)
+            if cost_rate:
+                cost_jpy = round(float(cost_rate) * SMM_USD_TO_JPY / 1000, 4)
+                profit   = round(sell_price - cost_jpy, 4)
+                margin_pct = round((profit / sell_price * 100) if sell_price else 0, 1)
+                value = (
+                    f"原価: ¥{cost_jpy}/件  →  販売: ¥{sell_price}/件\n"
+                    f"利益: ¥{profit}/件  利益率: {margin_pct}%  倍率: {round(margin, 2)}x"
+                )
+            else:
+                value = f"販売: ¥{sell_price}/件（原価データなし）"
+            embed.add_field(
+                name=f"[ID:{m['service_id']}] {m['name']}",
+                value=f"```{value}```",
+                inline=False,
+            )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 
 async def setup(bot: commands.Bot):
