@@ -125,3 +125,33 @@ def is_allowed():
             return False
         return True
     return app_commands.check(predicate)
+
+
+# ====================== 換金Bot用ユーティリティ ======================
+
+def create_error_embed(title: str = "Error", description: str = None) -> discord.Embed:
+    return discord.Embed(title=title, description=description, color=discord.Color.red())
+
+def create_success_embed(title: str = "Success", description: str = None) -> discord.Embed:
+    return discord.Embed(title=title, description=description, color=discord.Color.green())
+
+def create_info_embed(title: str = "Info", description: str = None) -> discord.Embed:
+    return discord.Embed(title=title, description=description, color=discord.Color.blue())
+
+def create_warning_embed(title: str = "Warning", description: str = None) -> discord.Embed:
+    return discord.Embed(title=title, description=description, color=discord.Color.orange())
+
+def mexc_not_logged_in_embed() -> discord.Embed:
+    return create_error_embed(description="MEXCアカウントが見つかりません。\n`/mexc login` コマンドでログインしてください。")
+
+def mexc_auth_error_embed() -> discord.Embed:
+    return create_error_embed(description="認証に失敗しました。\n再ログインしてください。")
+
+def mexc_network_error_embed() -> discord.Embed:
+    return create_warning_embed(description="しばらく待ってから再試行してください。")
+
+def panel_owner_not_found_embed() -> discord.Embed:
+    return create_error_embed(description="パネルの情報を取得できませんでした。\n管理者にお問い合わせください。")
+
+def loading_embed(message: str = "読み込み中...") -> discord.Embed:
+    return create_info_embed(description=message)

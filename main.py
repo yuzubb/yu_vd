@@ -125,6 +125,14 @@ async def on_ready():
     except Exception as e:
         print(f"[INFO] MainPanelView 登録失敗: {e}")
 
+    # LTC換金パネルの永続View
+    try:
+        from Cogs.exchange_panel import PersistentPanel
+        bot.add_view(PersistentPanel(bot))
+        print("[INFO] ExchangePersistentPanel 登録完了")
+    except Exception as e:
+        print(f"[INFO] ExchangePersistentPanel 登録失敗: {e}")
+
     try:
         commands_list = await bot.tree.fetch_commands()
         print(f"Registered commands: {len(commands_list)}")
