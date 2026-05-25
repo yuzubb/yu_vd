@@ -3,3 +3,4 @@ python-dotenv
 aiohttp
 flask
 useragent-changer
+ccxt
