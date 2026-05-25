@@ -133,6 +133,20 @@ async def on_ready():
     except Exception as e:
         print(f"[INFO] ExchangePersistentPanel 登録失敗: {e}")
 
+    # SMMフォロ爆自販機の永続View
+    try:
+        from Cogs.smm_vending import SmmPanelView, PayPayReceiveView, load_vending_data
+        smm_vending_data = load_vending_data()
+        for vm_id in smm_vending_data.keys():
+            bot.add_view(SmmPanelView(vm_id, bot))
+        bot.add_view(PayPayReceiveView(
+            link="", amount=0, sender="", money=0, money_light=0,
+            transaction_id="", created_at="", expires_at="",
+        ))
+        print("[INFO] SmmVendingViews 登録完了")
+    except Exception as e:
+        print(f"[INFO] SmmVendingViews 登録失敗: {e}")
+
     try:
         commands_list = await bot.tree.fetch_commands()
         print(f"Registered commands: {len(commands_list)}")
