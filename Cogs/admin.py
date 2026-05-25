@@ -124,8 +124,7 @@ class AdminCog(commands.Cog):
         await asyncio.sleep(1)
         await self.bot.close()
 
-        # 同じ Python / 引数でプロセスを置き換える
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        sys.exit(0) 
 
     # ════════════════════════════════════════════════════════
     #  /バックアップ
