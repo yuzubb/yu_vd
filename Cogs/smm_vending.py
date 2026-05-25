@@ -1,11 +1,3 @@
-"""
-smm_vending.py  ―  SMMフォロ爆自販機 Cog
-配置場所: Cogs/smm_vending.py
-
-.env に追記:
-    SMM_API_KEY=SMMのAPIキー
-"""
-
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands, ui
