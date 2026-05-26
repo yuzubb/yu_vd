@@ -147,6 +147,20 @@ async def on_ready():
     except Exception as e:
         print(f"[INFO] SmmVendingViews 登録失敗: {e}")
 
+    # SNSジャパン自販機の永続View
+    try:
+        from Cogs.snsjapan_vending import SnsjPanelView, SnsjPayPayReceiveView, load_vending_data as snsj_load_vending_data
+        snsj_vending_data = snsj_load_vending_data()
+        for vm_id in snsj_vending_data.keys():
+            bot.add_view(SnsjPanelView(vm_id, bot))
+        bot.add_view(SnsjPayPayReceiveView(
+            link="", amount=0, sender="", money=0, money_light=0,
+            transaction_id="", created_at="", expires_at="",
+        ))
+        print("[INFO] SnsjVendingViews 登録完了")
+    except Exception as e:
+        print(f"[INFO] SnsjVendingViews 登録失敗: {e}")
+
     try:
         commands_list = await bot.tree.fetch_commands()
         print(f"Registered commands: {len(commands_list)}")
