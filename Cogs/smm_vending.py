@@ -473,6 +473,47 @@ class SmmPurchaseConfirmView(ui.View):
             pass
 
 
+# ─── パネル embed ヘルパー ────────────────────────────────────────────────────
+PANEL_CATS_PER_PAGE = 4  # 1ページに表示するカテゴリ数
+
+def _build_panel_embed(title: str, description: str, menu_items: list, page: int = 0) -> tuple[discord.Embed, int]:
+    """
+    パネル用 Embed を生成する。
+    カテゴリを PANEL_CATS_PER_PAGE ずつ分割し、指定ページ分を返す。
+    戻り値: (embed, total_pages)
+    """
+    # 使用中カテゴリだけ抽出し順番を維持
+    used_cats = [c for c in SNS_CATEGORIES if any(m.get("category") == c["key"] for m in menu_items)]
+    total_pages = max(1, (len(used_cats) + PANEL_CATS_PER_PAGE - 1) // PANEL_CATS_PER_PAGE)
+    page = max(0, min(page, total_pages - 1))
+
+    embed = discord.Embed(title=title, description=description, color=0x2b2d31)
+
+    start = page * PANEL_CATS_PER_PAGE
+    page_cats = used_cats[start:start + PANEL_CATS_PER_PAGE]
+
+    for cat in page_cats:
+        items = [m for m in menu_items if m.get("category") == cat["key"]]
+        if not items:
+            continue
+        lines = []
+        for m in items:
+            line = f"{m['name']}：¥{m.get('price', 0)}/単価"
+            lines.append(line)
+        value = "\n".join(lines)
+        # 1024文字制限を超えないよう末尾を切り詰める
+        if len(value) > 1024:
+            value = value[:1020] + "…"
+        embed.add_field(name=f"{cat['emoji']} {cat['label']}", value=value, inline=False)
+
+    if not menu_items:
+        embed.description = (description or "") + "\n\n**/smmサービス追加** でサービスを登録してください。"
+
+    footer_text = f"SMM自販機  |  {page + 1} / {total_pages} ページ" if total_pages > 1 else "SMM自販機"
+    embed.set_footer(text=footer_text)
+    return embed, total_pages
+
+
 # ─── パネル UI ────────────────────────────────────────────────────────────────
 class SmmCategorySelect(ui.Select):
     def __init__(self, vm_id: str, bot: commands.Bot):
@@ -697,14 +738,82 @@ class SmmHistoryButton(ui.Button):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
+class SmmPanelPrevButton(ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="◀ 前のページ",
+            style=discord.ButtonStyle.secondary,
+            custom_id="smm_panel_prev",
+            row=2,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: SmmPanelView = self.view
+        if view.page > 0:
+            view.page -= 1
+            await view._update_panel(interaction)
+        else:
+            await interaction.response.defer()
+
+
+class SmmPanelNextButton(ui.Button):
+    def __init__(self):
+        super().__init__(
+            label="次のページ ▶",
+            style=discord.ButtonStyle.secondary,
+            custom_id="smm_panel_next",
+            row=2,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: SmmPanelView = self.view
+        if view.page < view.total_pages - 1:
+            view.page += 1
+            await view._update_panel(interaction)
+        else:
+            await interaction.response.defer()
+
+
 class SmmPanelView(ui.View):
-    def __init__(self, vm_id: str, bot: commands.Bot):
+    def __init__(self, vm_id: str, bot: commands.Bot, page: int = 0, total_pages: int = 1):
         super().__init__(timeout=None)
-        self.vm_id = vm_id
-        self.bot   = bot
+        self.vm_id       = vm_id
+        self.bot         = bot
+        self.page        = page
+        self.total_pages = total_pages
         self.add_item(SmmCategorySelect(vm_id, bot))
         self.add_item(SmmStatusButton())
         self.add_item(SmmHistoryButton())
+        self._prev_btn = SmmPanelPrevButton()
+        self._next_btn = SmmPanelNextButton()
+        self._refresh_page_buttons()
+
+    def _refresh_page_buttons(self):
+        # ページボタンは複数ページある場合のみ追加
+        # まず既存のページボタンを除去してから再追加
+        self.children[:] = [c for c in self.children
+                            if not isinstance(c, (SmmPanelPrevButton, SmmPanelNextButton))]
+        if self.total_pages > 1:
+            self._prev_btn.disabled = (self.page == 0)
+            self._next_btn.disabled = (self.page >= self.total_pages - 1)
+            self.add_item(self._prev_btn)
+            self.add_item(self._next_btn)
+
+    async def _update_panel(self, interaction: discord.Interaction):
+        vd = load_vending_data()
+        vm = vd.get(self.vm_id, {})
+        menu_items = [m for m in load_smm_menu() if m.get("vm_id") == self.vm_id]
+
+        old_embed = interaction.message.embeds[0] if interaction.message and interaction.message.embeds else None
+        title     = old_embed.title       if old_embed else "24時間フォロ爆自販機"
+        desc      = old_embed.description if old_embed else "PayPay決済対応 | 24時間稼働中"
+        # footerのページ表記を除いた本来のdescriptionを取得
+        if desc and "\n\n**/smmサービス追加**" in desc:
+            desc = desc.split("\n\n**/smmサービス追加**")[0]
+
+        embed, self.total_pages = _build_panel_embed(title, desc, menu_items, self.page)
+        self._refresh_page_buttons()
+        await interaction.response.edit_message(embed=embed, view=self)
 
 
 # ─── 売上集計 ─────────────────────────────────────────────────────────────────
@@ -844,7 +953,7 @@ class SmmVendingCog(commands.Cog):
     async def cog_load(self):
         vending_data = load_vending_data()
         for vm_id in vending_data.keys():
-            self.bot.add_view(SmmPanelView(vm_id, self.bot))
+            self.bot.add_view(SmmPanelView(vm_id, self.bot, page=0, total_pages=1))
         self.bot.add_view(PayPayReceiveView(
             link="", amount=0, sender="", money=0, money_light=0,
             transaction_id="", created_at="", expires_at="",
@@ -873,16 +982,8 @@ class SmmVendingCog(commands.Cog):
                 title      = old_embed.title       if old_embed else "24時間フォロ爆自販機"
                 desc       = old_embed.description if old_embed else "PayPay決済対応 | 24時間稼働中"
 
-                embed = discord.Embed(title=title, description=desc, color=0x2b2d31)
-                embed.set_footer(text="SMM自販機")
-                for cat in SNS_CATEGORIES:
-                    items = [m for m in menu_items if m.get("category") == cat["key"]]
-                    if not items:
-                        continue
-                    lines = [f"{m['name']}：¥{m.get('price', 0)}/単価" for m in items]
-                    embed.add_field(name=cat["label"], value="\n".join(lines), inline=False)
-
-                view = SmmPanelView(vm_id, self.bot)
+                embed, total_pages = _build_panel_embed(title, desc, menu_items, page=0)
+                view = SmmPanelView(vm_id, self.bot, page=0, total_pages=total_pages)
                 await msg.edit(embed=embed, view=view)
             except Exception as e:
                 print(f"[smm_panel_refresh] vm_id={vm_id} error: {e}")
@@ -1130,18 +1231,9 @@ class SmmVendingCog(commands.Cog):
             return await interaction.response.send_message("❌ 指定された自販機が見つかりません。", ephemeral=True)
 
         menu_items = [m for m in load_smm_menu() if m.get("vm_id") == vm_id]
-        embed      = discord.Embed(title=title, description=description, color=0x2b2d31)
-        embed.set_footer(text="SMM自販機")
-        for cat in SNS_CATEGORIES:
-            items = [m for m in menu_items if m.get("category") == cat["key"]]
-            if not items:
-                continue
-            lines = [f"{m['name']}：¥{m.get('price', 0)}/単価" for m in items]
-            embed.add_field(name=cat["label"], value="\n".join(lines), inline=False)
-        if not menu_items:
-            embed.description += "\n\n**/smmサービス追加** でサービスを登録してください。"
+        embed, total_pages = _build_panel_embed(title, description, menu_items, page=0)
 
-        view = SmmPanelView(vm_id, self.bot)
+        view = SmmPanelView(vm_id, self.bot, page=0, total_pages=total_pages)
         self.bot.add_view(view)
         await interaction.response.send_message("✅ フォロ爆自販機パネルを設置しました。", ephemeral=True)
         msg = await interaction.channel.send(embed=embed, view=view)
