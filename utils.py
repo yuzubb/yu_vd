@@ -155,3 +155,17 @@ def panel_owner_not_found_embed() -> discord.Embed:
 
 def loading_embed(message: str = "読み込み中...") -> discord.Embed:
     return create_info_embed(description=message)
+
+# ====================== 許可ユーザー管理 ======================
+def save_allowed_users(user_ids: list):
+    os.makedirs("data", exist_ok=True)
+    data = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError:
+            pass
+    data["allowed_user_ids"] = user_ids
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
